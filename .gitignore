@@ -1,0 +1,25 @@
+# Ignorar arquivos de credenciais do Google (EXTREMAMENTE IMPORTANTE PARA SEGURANÇA)
+AuthNOC.json
+token_leitura.json
+credentials.json
+eace_cache.json
+AuthWebLocal.json
+oauth_state.json
+config_pleito.json
+
+# Ignorar pastas temporárias do Python e do PyInstaller
+__pycache__/
+build/
+dist/
+*.spec
+.env
+*.exe
+
+# Ignorar banco de dados e arquivos locais grandes (opcional, se houver)
+*.db
+*.sqlite3
+*.csv
+*.xlsx
+
+# Arquivos locais do Streamlit
+.streamlit/
