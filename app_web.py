@@ -1176,8 +1176,12 @@ if not st.session_state['autenticado']:
     # TELA DE LOGIN
     st.title("🔒 Acesso Restrito - Ferramenta EACE")
     st.markdown("Por favor, insira a senha da equipe para acessar o portal.")
-    senha = st.text_input("Senha:", type="password")
-    if st.button("Entrar"):
+    
+    with st.form("login_form"):
+        senha = st.text_input("Senha:", type="password")
+        btn_login = st.form_submit_button("Entrar")
+        
+    if btn_login:
         # Puxa a lista de senhas EXCLUSIVAMENTE do Secrets da Nuvem
         senhas_permitidas = st.secrets.get("senhas_portal", [])
         
