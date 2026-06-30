@@ -983,6 +983,19 @@ def modulo_enviador_pleito():
                 # Agora usa a credencial da sessão e não o authenticate_gmail antigo centralizado
                 gmail_service = build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
                 
+                # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
+                profile = gmail_service.users().getProfile(userId='me').execute()
+                user_email = profile.get('emailAddress', '').lower()
+                modelo = dados.get('modelo', '')
+                
+                if modelo == "BITNET" and "st1.net.br" in user_email:
+                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio ST1).")
+                    return
+                elif modelo == "ST1" and "bitinternet.com.br" in user_email:
+                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **ST1**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio BITNET).")
+                    return
+                # -------------------------------------
+                
                 msg = EmailMessage()
                 msg['To'] = email_to
                 if email_cc: msg['Cc'] = email_cc
