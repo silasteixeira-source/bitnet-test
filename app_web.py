@@ -770,6 +770,11 @@ def get_oauth_login_url():
         return None
 
 def modulo_enviador_pleito():
+    st.markdown("### 🚧 Módulo em Desenvolvimento")
+    st.warning("O Enviador de Pleitos na Nuvem está passando por adequações de segurança (OAuth) junto ao Google Cloud e se encontra temporariamente bloqueado para a equipe.")
+    st.info("Por favor, continue utilizando a versão Desktop (`.exe`) original para o envio de pleitos enquanto estabilizamos a versão Nuvem.")
+    return
+    
     check_oauth_callback()
     
     st.markdown("### 📄 AUTOMAÇÃO EACE (E-MAIL/DOCX)")
