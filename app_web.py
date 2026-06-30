@@ -694,8 +694,11 @@ def check_oauth_callback():
     
     # MÁGICA DA NUVEM: Cria o arquivo a partir do cofre se estiver na web
     if not os.path.exists(web_client_file) and "google_auth_web" in st.secrets:
+        auth_web = dict(st.secrets["google_auth_web"])
+        if "web" in auth_web:
+            auth_web["web"] = dict(auth_web["web"])
         with open(web_client_file, "w") as f:
-            f.write(json.dumps(dict(st.secrets["google_auth_web"])))
+            f.write(json.dumps(auth_web))
             
     if "code" in st.query_params and "gmail_creds" not in st.session_state:
         code = st.query_params["code"]
@@ -735,8 +738,11 @@ def get_oauth_login_url():
     
     # MÁGICA DA NUVEM: Cria o arquivo a partir do cofre se estiver na web
     if not os.path.exists(web_client_file) and "google_auth_web" in st.secrets:
+        auth_web = dict(st.secrets["google_auth_web"])
+        if "web" in auth_web:
+            auth_web["web"] = dict(auth_web["web"])
         with open(web_client_file, "w") as f:
-            f.write(json.dumps(dict(st.secrets["google_auth_web"])))
+            f.write(json.dumps(auth_web))
             
     if not os.path.exists(web_client_file):
         return None
