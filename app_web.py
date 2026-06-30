@@ -1007,6 +1007,9 @@ def modulo_enviador_pleito():
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
 
+import platform
+import subprocess
+
 def modulo_ferramentas():
     st.title("🛠️ Ferramentas Extras")
     
@@ -1042,31 +1045,47 @@ def modulo_ferramentas():
                             except Exception as e:
                                 st.error(f"Erro ao converter {f.name}: {e}")
         else:
-            st.warning("Nota: A conversão Word para PDF na Nuvem pode estar indisponível. Funciona no Localhost.")
+            st.info("💡 A conversão Word para PDF usa recursos nativos do seu sistema. Funciona no Windows e na Nuvem (Streamlit Cloud).")
             files = st.file_uploader("Selecione arquivos Word", type=["docx"], accept_multiple_files=True, key="word2pdf")
             if files:
                 if st.button("Converter para PDF", type="primary"):
-                    if docx_to_pdf_convert is None:
-                        st.error("Biblioteca 'docx2pdf' ou MS Word não estão disponíveis neste servidor.")
-                    else:
-                        for f in files:
-                            with st.spinner(f"Convertendo {f.name}..."):
-                                try:
-                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_in:
-                                        tmp_in.write(f.read())
-                                        tmp_in_path = tmp_in.name
-                                    tmp_out_path = tmp_in_path + ".pdf"
-                                    
+                    for f in files:
+                        with st.spinner(f"Convertendo {f.name}..."):
+                            try:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_in:
+                                    tmp_in.write(f.read())
+                                    tmp_in_path = tmp_in.name
+                                
+                                temp_dir = os.path.dirname(tmp_in_path)
+                                tmp_out_path = tmp_in_path.replace(".docx", ".pdf")
+                                
+                                if platform.system() == "Windows":
+                                    if docx_to_pdf_convert is None:
+                                        st.error("Biblioteca 'docx2pdf' ou MS Word não estão instalados no seu Windows.")
+                                        continue
                                     docx_to_pdf_convert(tmp_in_path, tmp_out_path)
-                                    
+                                else:
+                                    # Linux / Nuvem
+                                    result = subprocess.run(
+                                        ['libreoffice', '--headless', '--convert-to', 'pdf', tmp_in_path, '--outdir', temp_dir],
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                                    )
+                                    if result.returncode != 0:
+                                        st.error(f"Erro no servidor ao converter {f.name}: {result.stderr}")
+                                        continue
+                                
+                                if os.path.exists(tmp_out_path):
                                     with open(tmp_out_path, "rb") as fout:
                                         st.download_button(label=f"⬇️ Baixar {f.name.replace('.docx', '.pdf')}",
                                                            data=fout,
                                                            file_name=f.name.replace('.docx', '.pdf'),
                                                            mime="application/pdf",
                                                            key=f"d2_{f.name}")
-                                except Exception as e:
-                                    st.error(f"Erro ao converter {f.name}: {e}")
+                                else:
+                                    st.error("Falha ao gerar o arquivo PDF.")
+                                    
+                            except Exception as e:
+                                st.error(f"Erro ao converter {f.name}: {e}")
 
     # --- TAB 2: Unificador de Evidências ---
     with tab2:
