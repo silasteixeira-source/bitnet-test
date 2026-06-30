@@ -708,7 +708,8 @@ def check_oauth_callback():
                 st.error("Arquivo AuthWebLocal.json não encontrado. Configure-o primeiro.")
                 return
             
-            redirect_uri = "http://localhost:8501" 
+            is_cloud = "google_auth_web" in st.secrets
+            redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501" 
             flow = Flow.from_client_secrets_file(
                 web_client_file,
                 scopes=['https://www.googleapis.com/auth/gmail.send'],
@@ -747,10 +748,13 @@ def get_oauth_login_url():
     if not os.path.exists(web_client_file):
         return None
     try:
+        is_cloud = "google_auth_web" in st.secrets
+        redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501"
+        
         flow = Flow.from_client_secrets_file(
             web_client_file,
             scopes=['https://www.googleapis.com/auth/gmail.send'],
-            redirect_uri="http://localhost:8501"
+            redirect_uri=redirect_uri
         )
         auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
         
