@@ -12,6 +12,16 @@ import pandas as pd
 import io
 from docx import Document
 from email.message import EmailMessage
+import tempfile
+import shutil
+import pypdf
+from pdf2docx import Converter
+try:
+    from docx2pdf import convert as docx_to_pdf_convert
+except ImportError:
+    docx_to_pdf_convert = None
+from PIL import Image, ImageOps, ImageDraw, ImageFont
+import textwrap
 
 # ==========================================
 # CONFIGURAÇÃO GLOBAL DA PÁGINA
@@ -997,6 +1007,145 @@ def modulo_enviador_pleito():
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
 
+def modulo_ferramentas():
+    st.title("🛠️ Ferramentas Extras")
+    
+    tab1, tab2 = st.tabs(["🔄 Conversor Bidirecional", "📚 Unificador de Evidências"])
+    
+    # --- TAB 1: Conversor Bidirecional ---
+    with tab1:
+        st.markdown("### Conversor Bidirecional de Documentos")
+        sentido = st.radio("Sentido da Conversão:", ["PDF para Word (.docx)", "Word (.docx) para PDF"])
+        
+        if "PDF para Word" in sentido:
+            files = st.file_uploader("Selecione arquivos PDF", type=["pdf"], accept_multiple_files=True, key="pdf2word")
+            if files:
+                if st.button("Converter para Word", type="primary"):
+                    for f in files:
+                        with st.spinner(f"Convertendo {f.name}..."):
+                            try:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_in:
+                                    tmp_in.write(f.read())
+                                    tmp_in_path = tmp_in.name
+                                tmp_out_path = tmp_in_path + ".docx"
+                                
+                                cv = Converter(tmp_in_path)
+                                cv.convert(tmp_out_path)
+                                cv.close()
+                                
+                                with open(tmp_out_path, "rb") as fout:
+                                    st.download_button(label=f"⬇️ Baixar {f.name.replace('.pdf', '.docx')}",
+                                                       data=fout,
+                                                       file_name=f.name.replace('.pdf', '.docx'),
+                                                       mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                                       key=f"d_{f.name}")
+                            except Exception as e:
+                                st.error(f"Erro ao converter {f.name}: {e}")
+        else:
+            st.warning("Nota: A conversão Word para PDF na Nuvem pode estar indisponível. Funciona no Localhost.")
+            files = st.file_uploader("Selecione arquivos Word", type=["docx"], accept_multiple_files=True, key="word2pdf")
+            if files:
+                if st.button("Converter para PDF", type="primary"):
+                    if docx_to_pdf_convert is None:
+                        st.error("Biblioteca 'docx2pdf' ou MS Word não estão disponíveis neste servidor.")
+                    else:
+                        for f in files:
+                            with st.spinner(f"Convertendo {f.name}..."):
+                                try:
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_in:
+                                        tmp_in.write(f.read())
+                                        tmp_in_path = tmp_in.name
+                                    tmp_out_path = tmp_in_path + ".pdf"
+                                    
+                                    docx_to_pdf_convert(tmp_in_path, tmp_out_path)
+                                    
+                                    with open(tmp_out_path, "rb") as fout:
+                                        st.download_button(label=f"⬇️ Baixar {f.name.replace('.docx', '.pdf')}",
+                                                           data=fout,
+                                                           file_name=f.name.replace('.docx', '.pdf'),
+                                                           mime="application/pdf",
+                                                           key=f"d2_{f.name}")
+                                except Exception as e:
+                                    st.error(f"Erro ao converter {f.name}: {e}")
+
+    # --- TAB 2: Unificador de Evidências ---
+    with tab2:
+        st.markdown("### Unificador de Evidências Multiformato")
+        st.info("Suporta Imagens (PNG/JPG), Texto (TXT) e PDFs. (Suporte a DOCX omitido).")
+        
+        nome_final = st.text_input("Nome do arquivo PDF final (sem extensão):", value="Evidencias_Unificadas")
+        otimizar = st.checkbox("Otimizar tamanho das imagens", value=True)
+        
+        files = st.file_uploader("Selecione os arquivos na ordem desejada", type=["png", "jpg", "jpeg", "txt", "pdf"], accept_multiple_files=True)
+        
+        if files:
+            st.write(f"**{len(files)} arquivos selecionados para mesclar.**")
+            
+            if st.button("⚡ GERAR PDF UNIFICADO ⚡", type="primary", use_container_width=True):
+                with st.spinner("Unificando evidências..."):
+                    try:
+                        temp_dir = tempfile.mkdtemp()
+                        pdf_parts = []
+                        
+                        for idx, f in enumerate(files):
+                            ext = os.path.splitext(f.name)[1].lower()
+                            temp_pdf_path = os.path.join(temp_dir, f"part_{idx}.pdf")
+                            
+                            if ext in [".png", ".jpg", ".jpeg"]:
+                                img = Image.open(f)
+                                img = ImageOps.exif_transpose(img).convert('RGB')
+                                if otimizar:
+                                    max_size = 1920
+                                    if img.width > max_size or img.height > max_size:
+                                        img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                                img.save(temp_pdf_path, "PDF", resolution=100.0, quality=80)
+                                pdf_parts.append(temp_pdf_path)
+                                
+                            elif ext == ".txt":
+                                text = f.getvalue().decode('utf-8', errors='replace')
+                                try:
+                                    font = ImageFont.truetype("arial.ttf", 20)
+                                except:
+                                    font = ImageFont.load_default()
+                                img = Image.new('RGB', (1240, 1754), color=(255, 255, 255))
+                                draw = ImageDraw.Draw(img)
+                                lines = []
+                                for p in text.split('\n'): lines.extend(textwrap.wrap(p, width=85))
+                                y = 50
+                                for line in lines:
+                                    draw.text((50, y), line, font=font, fill=(0, 0, 0))
+                                    y += 30
+                                img.save(temp_pdf_path, "PDF", resolution=100.0)
+                                pdf_parts.append(temp_pdf_path)
+                                
+                            elif ext == ".pdf":
+                                with open(temp_pdf_path, "wb") as ftemp:
+                                    ftemp.write(f.read())
+                                pdf_parts.append(temp_pdf_path)
+                                
+                        if not pdf_parts:
+                            st.error("Nenhuma parte do PDF foi gerada.")
+                        else:
+                            writer = pypdf.PdfWriter()
+                            for part in pdf_parts:
+                                reader = pypdf.PdfReader(part)
+                                for page in reader.pages:
+                                    writer.add_page(page)
+                                    
+                            out_path = os.path.join(temp_dir, f"{nome_final}.pdf")
+                            with open(out_path, "wb") as f_out:
+                                writer.write(f_out)
+                                
+                            with open(out_path, "rb") as final_pdf:
+                                st.success("✅ PDF unificado gerado com sucesso!")
+                                st.download_button(label=f"⬇️ Baixar {nome_final}.pdf",
+                                                   data=final_pdf,
+                                                   file_name=f"{nome_final}.pdf",
+                                                   mime="application/pdf",
+                                                   use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Erro ao unificar: {e}")
+
 # ==========================================
 # CAMADA DE SEGURANÇA E ROTEAMENTO
 # ==========================================
@@ -1025,7 +1174,7 @@ st.sidebar.markdown("---")
 
 menu = st.sidebar.radio(
     "Navegação:",
-    ("📊 Consulta EACE", "🤖 Robô Leitor do Gmail", "📝 Gerar Contrato", "✉️ Enviador de Pleitos")
+    ("📊 Consulta EACE", "🤖 Robô Leitor do Gmail", "📝 Gerar Contrato", "✉️ Enviador de Pleitos", "🛠️ Ferramentas")
 )
 
 st.sidebar.markdown("---")
@@ -1042,6 +1191,8 @@ elif menu == "📝 Gerar Contrato":
     modulo_gerador_contrato()
 elif menu == "✉️ Enviador de Pleitos":
     modulo_enviador_pleito()
+elif menu == "🛠️ Ferramentas":
+    modulo_ferramentas()
 else:
     st.title(menu)
     st.warning("Este módulo ainda está sendo migrado para a versão Web.")

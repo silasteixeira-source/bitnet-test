@@ -5,3 +5,7 @@ google-auth-oauthlib
 gspread
 pandas
 python-docx
+pypdf
+pdf2docx
+docx2pdf
+Pillow
