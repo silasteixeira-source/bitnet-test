@@ -1178,8 +1178,8 @@ if not st.session_state['autenticado']:
     st.markdown("Por favor, insira a senha da equipe para acessar o portal.")
     senha = st.text_input("Senha:", type="password")
     if st.button("Entrar"):
-        # Puxa a lista de senhas do Secrets (ou usa uma senha super segura padrão caso não ache o Secrets)
-        senhas_permitidas = st.secrets.get("senhas_portal", ["Noc@2026", "Eace@2026"])
+        # Puxa a lista de senhas EXCLUSIVAMENTE do Secrets da Nuvem
+        senhas_permitidas = st.secrets.get("senhas_portal", [])
         
         # Se for só uma string no Secrets, converte pra lista
         if isinstance(senhas_permitidas, str):
