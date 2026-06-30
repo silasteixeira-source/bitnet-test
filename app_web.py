@@ -1189,7 +1189,10 @@ if not st.session_state['autenticado']:
         if isinstance(senhas_permitidas, str):
             senhas_permitidas = [senhas_permitidas]
             
-        if senha in senhas_permitidas: 
+        # Pega a senha digitada sem espaços perdidos
+        senha_limpa = senha.strip()
+            
+        if senha_limpa in senhas_permitidas: 
             st.session_state['autenticado'] = True
             st.rerun()
         else:
