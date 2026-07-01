@@ -871,6 +871,26 @@ def modulo_enviador_pleito():
     st.write("")
     
     # AUTENTICAÇÃO OBRIGATÓRIA (OAuth)
+    if "gmail_creds" not in st.session_state:
+        from google.oauth2.credentials import Credentials
+        # 1. Tenta carregar dos Secrets da nuvem (Bypass do OAuth bloqueado)
+        if "google_auth_token_envio" in st.secrets:
+            try:
+                creds = Credentials.from_authorized_user_info(dict(st.secrets["google_auth_token_envio"]), ['https://www.googleapis.com/auth/gmail.send'])
+                if creds and creds.valid:
+                    st.session_state["gmail_creds"] = creds
+            except Exception:
+                pass
+        
+        # 2. Tenta carregar do disco (uso local)
+        elif os.path.exists("token_envio.json"):
+            try:
+                creds = Credentials.from_authorized_user_file("token_envio.json", ['https://www.googleapis.com/auth/gmail.send'])
+                if creds and creds.valid:
+                    st.session_state["gmail_creds"] = creds
+            except Exception:
+                pass
+                
     if "gmail_creds" not in st.session_state or not st.session_state["gmail_creds"].valid:
         st.info("🔒 Para continuar, você precisa fazer login com sua conta do Google para enviar os e-mails em seu próprio nome.")
         login_url = get_oauth_login_url()
