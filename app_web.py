@@ -145,6 +145,46 @@ def extrair_texto_da_mensagem(payload):
         return f"[Erro ao extrair corpo da mensagem: {e}]"
     return "Conteúdo da mensagem não suportado ou vazio."
 
+def extrair_arquivos_da_mensagem(service, msg_id, payload):
+    """Varre o payload buscando anexos de imagem e PDF e faz o download via API."""
+    arquivos = []
+    
+    def buscar_anexos(p):
+        mime = p.get("mimeType", "")
+        
+        # Se for imagem ou PDF, e tiver um ID de anexo (inline ou real)
+        if mime.startswith("image/") or mime == "application/pdf":
+            body = p.get("body", {})
+            attachment_id = body.get("attachmentId")
+            if attachment_id:
+                try:
+                    att = service.users().messages().attachments().get(
+                        userId='me', messageId=msg_id, id=attachment_id).execute()
+                    data = att.get("data")
+                    if data:
+                        file_bytes = base64.urlsafe_b64decode(data)
+                        filename = p.get("filename", "")
+                        if not filename: 
+                            if mime == "application/pdf":
+                                filename = "anexo.pdf"
+                            else:
+                                filename = "imagem_inline.png"
+                        arquivos.append({"filename": filename, "bytes": file_bytes, "mimeType": mime})
+                except Exception as e:
+                    pass
+        
+        # Chamada recursiva para parts
+        if "parts" in p:
+            for part in p["parts"]:
+                buscar_anexos(part)
+                
+    try:
+        buscar_anexos(payload)
+    except Exception as e:
+        pass
+        
+    return arquivos
+
 
 # ==========================================
 # MÓDULOS (TELAS)
@@ -206,6 +246,38 @@ def modulo_robo_gmail():
                                     payload = msg_full.get("payload", {})
                                     texto_corpo = extrair_texto_da_mensagem(payload)
                                     st.text(texto_corpo)
+                                    
+                                    # Extrair e exibir anexos
+                                    arquivos = extrair_arquivos_da_mensagem(service, msg['id'], payload)
+                                    if arquivos:
+                                        st.markdown("---")
+                                        st.markdown("#### 📁 Anexos Deste E-mail:")
+                                        
+                                        # Separa imagens de PDFs para exibir de forma bonita
+                                        imagens = [a for a in arquivos if a["mimeType"].startswith("image/")]
+                                        pdfs = [a for a in arquivos if a["mimeType"] == "application/pdf"]
+                                        
+                                        if pdfs:
+                                            st.write("**📄 Documentos (PDF):**")
+                                            for p in pdfs:
+                                                st.download_button(
+                                                    label=f"⬇️ Baixar {p['filename']}",
+                                                    data=p['bytes'],
+                                                    file_name=p['filename'],
+                                                    mime="application/pdf",
+                                                    key=f"dl_{msg['id']}_{p['filename']}"
+                                                )
+                                                
+                                        if imagens:
+                                            st.write("**🖼️ Imagens / Prints:**")
+                                            cols = st.columns(min(len(imagens), 3))
+                                            for i, img in enumerate(imagens):
+                                                with cols[i % len(cols)]:
+                                                    try:
+                                                        st.image(img["bytes"], caption=img["filename"], use_container_width=True)
+                                                    except Exception as e:
+                                                        st.error(f"Erro ao exibir {img['filename']}: {e}")
+                                                    
                                     
                     except Exception as e:
                         st.error(f"Ocorreu um erro durante a busca: {e}")
@@ -783,11 +855,9 @@ def get_oauth_login_url():
         return None
 
 def modulo_enviador_pleito():
-    st.markdown("### 🚧 Módulo em Desenvolvimento")
-    st.warning("O Enviador de Pleitos na Nuvem está passando por adequações de segurança (OAuth) junto ao Google Cloud e se encontra temporariamente bloqueado para a equipe.")
-    st.info("Por favor, continue utilizando a versão Desktop (`.exe`) original para o envio de pleitos enquanto estabilizamos a versão Nuvem.")
-    return
-    
+    st.error("🛑 **ACESSO RESTRITO**")
+    st.warning("Este módulo é de uso restrito e autorizado **APENAS** para pessoas expressamente designadas para o envio oficial de e-mails do NOC. Se você não possui autorização, não utilize esta funcionalidade.")
+    st.markdown("---")
     check_oauth_callback()
     
     st.markdown("### 📄 AUTOMAÇÃO EACE (E-MAIL/DOCX)")
@@ -985,6 +1055,19 @@ def modulo_enviador_pleito():
                 from googleapiclient.discovery import build
                 # Agora usa a credencial da sessão e não o authenticate_gmail antigo centralizado
                 gmail_service = build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
+                
+                # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
+                profile = gmail_service.users().getProfile(userId='me').execute()
+                user_email = profile.get('emailAddress', '').lower()
+                modelo = dados.get('modelo', '')
+                
+                if modelo == "BITNET" and "st1.net.br" in user_email:
+                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio ST1).")
+                    return
+                elif modelo == "ST1" and "bitinternet.com.br" in user_email:
+                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **ST1**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio BITNET).")
+                    return
+                # -------------------------------------
                 
                 msg = EmailMessage()
                 msg['To'] = email_to
