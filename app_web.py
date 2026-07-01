@@ -151,8 +151,19 @@ def extrair_imagens_da_mensagem(service, msg_id, payload):
     
     def buscar_anexos(p):
         mime = p.get("mimeType", "")
-        # Se for imagem e tiver um ID de anexo (pode ser anexo real ou inline)
-        if mime.startswith("image/"):
+        
+        # Filtro para ignorar assinaturas e imagens inline indesejadas
+        is_signature = False
+        if "cid" in str(p.get("filename", "")).lower():
+            is_signature = True
+        for h in p.get("headers", []):
+            nome_header = h.get('name', '').lower()
+            valor_header = str(h.get('value', '')).lower()
+            if nome_header == 'content-id' or 'cid' in valor_header:
+                is_signature = True
+                
+        # Se for imagem, tiver um ID de anexo, e NÃO for uma assinatura (cid)
+        if not is_signature and mime.startswith("image/"):
             body = p.get("body", {})
             attachment_id = body.get("attachmentId")
             if attachment_id:
@@ -162,8 +173,8 @@ def extrair_imagens_da_mensagem(service, msg_id, payload):
                     data = att.get("data")
                     if data:
                         img_bytes = base64.urlsafe_b64decode(data)
-                        filename = p.get("filename", "imagem")
-                        if not filename: filename = "imagem_inline"
+                        filename = p.get("filename", "imagem_anexada")
+                        if not filename: filename = "imagem"
                         imagens.append({"filename": filename, "bytes": img_bytes, "mimeType": mime})
                 except Exception as e:
                     pass
