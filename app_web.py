@@ -145,47 +145,15 @@ def extrair_texto_da_mensagem(payload):
         return f"[Erro ao extrair corpo da mensagem: {e}]"
     return "Conteúdo da mensagem não suportado ou vazio."
 
-def extrair_imagens_da_mensagem(service, msg_id, payload):
-    """Varre o payload buscando anexos de imagem e faz o download via API."""
-    imagens = []
-    
-    # 1. Encontra os CIDs válidos (imagens que aparecem ANTES de "Atenciosamente,")
-    def buscar_html(p):
-        mime = p.get("mimeType")
-        if mime == "text/html":
-            d = p.get("body", {}).get("data")
-            if d: return base64.urlsafe_b64decode(d).decode("utf-8", errors="ignore")
-        if "parts" in p:
-            for part in p["parts"]:
-                res = buscar_html(part)
-                if res: return res
-        return ""
-        
-    html = buscar_html(payload)
-    cids_validos = []
-    if html:
-        # Pega tudo antes do Atenciosamente
-        partes = re.split(r'(?i)atenciosamente,?', html)
-        html_util = partes[0]
-        cids_encontrados = re.findall(r'src=["\']cid:([^"\']+)["\']', html_util, flags=re.IGNORECASE)
-        cids_validos = [c.strip() for c in cids_encontrados]
+def extrair_arquivos_da_mensagem(service, msg_id, payload):
+    """Varre o payload buscando anexos de imagem e PDF e faz o download via API."""
+    arquivos = []
     
     def buscar_anexos(p):
         mime = p.get("mimeType", "")
         
-        # Identifica se a imagem é inline (tem Content-ID)
-        content_id = ""
-        for h in p.get("headers", []):
-            if h.get('name', '').lower() == 'content-id':
-                content_id = str(h.get('value', '')).strip('<>')
-                
-        is_signature = False
-        # Se ela for uma imagem inline e o ID dela não estiver na lista de imagens antes do "Atenciosamente"
-        if content_id and content_id not in cids_validos:
-            is_signature = True
-                
-        # Se for imagem, tiver um ID de anexo, e NÃO for uma assinatura
-        if not is_signature and mime.startswith("image/"):
+        # Se for imagem ou PDF, e tiver um ID de anexo (inline ou real)
+        if mime.startswith("image/") or mime == "application/pdf":
             body = p.get("body", {})
             attachment_id = body.get("attachmentId")
             if attachment_id:
@@ -194,10 +162,14 @@ def extrair_imagens_da_mensagem(service, msg_id, payload):
                         userId='me', messageId=msg_id, id=attachment_id).execute()
                     data = att.get("data")
                     if data:
-                        img_bytes = base64.urlsafe_b64decode(data)
-                        filename = p.get("filename", "imagem_anexada")
-                        if not filename: filename = f"imagem_inline_{content_id}.png"
-                        imagens.append({"filename": filename, "bytes": img_bytes, "mimeType": mime})
+                        file_bytes = base64.urlsafe_b64decode(data)
+                        filename = p.get("filename", "")
+                        if not filename: 
+                            if mime == "application/pdf":
+                                filename = "anexo.pdf"
+                            else:
+                                filename = "imagem_inline.png"
+                        arquivos.append({"filename": filename, "bytes": file_bytes, "mimeType": mime})
                 except Exception as e:
                     pass
         
@@ -211,7 +183,7 @@ def extrair_imagens_da_mensagem(service, msg_id, payload):
     except Exception as e:
         pass
         
-    return imagens
+    return arquivos
 
 
 # ==========================================
@@ -275,19 +247,36 @@ def modulo_robo_gmail():
                                     texto_corpo = extrair_texto_da_mensagem(payload)
                                     st.text(texto_corpo)
                                     
-                                    # Extrair e exibir imagens
-                                    imagens = extrair_imagens_da_mensagem(service, msg['id'], payload)
-                                    if imagens:
+                                    # Extrair e exibir anexos
+                                    arquivos = extrair_arquivos_da_mensagem(service, msg['id'], payload)
+                                    if arquivos:
                                         st.markdown("---")
-                                        st.markdown("#### 📎 Imagens Anexadas:")
-                                        # Cria colunas se tiver muitas imagens para ficar bonito
-                                        cols = st.columns(min(len(imagens), 3))
-                                        for i, img in enumerate(imagens):
-                                            with cols[i % len(cols)]:
-                                                try:
-                                                    st.image(img["bytes"], caption=img["filename"], use_container_width=True)
-                                                except Exception as e:
-                                                    st.error(f"Erro ao exibir {img['filename']}: {e}")
+                                        st.markdown("#### 📁 Anexos Deste E-mail:")
+                                        
+                                        # Separa imagens de PDFs para exibir de forma bonita
+                                        imagens = [a for a in arquivos if a["mimeType"].startswith("image/")]
+                                        pdfs = [a for a in arquivos if a["mimeType"] == "application/pdf"]
+                                        
+                                        if pdfs:
+                                            st.write("**📄 Documentos (PDF):**")
+                                            for p in pdfs:
+                                                st.download_button(
+                                                    label=f"⬇️ Baixar {p['filename']}",
+                                                    data=p['bytes'],
+                                                    file_name=p['filename'],
+                                                    mime="application/pdf",
+                                                    key=f"dl_{msg['id']}_{p['filename']}"
+                                                )
+                                                
+                                        if imagens:
+                                            st.write("**🖼️ Imagens / Prints:**")
+                                            cols = st.columns(min(len(imagens), 3))
+                                            for i, img in enumerate(imagens):
+                                                with cols[i % len(cols)]:
+                                                    try:
+                                                        st.image(img["bytes"], caption=img["filename"], use_container_width=True)
+                                                    except Exception as e:
+                                                        st.error(f"Erro ao exibir {img['filename']}: {e}")
                                                     
                                     
                     except Exception as e:
