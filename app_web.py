@@ -145,6 +145,41 @@ def extrair_texto_da_mensagem(payload):
         return f"[Erro ao extrair corpo da mensagem: {e}]"
     return "Conteúdo da mensagem não suportado ou vazio."
 
+def extrair_imagens_da_mensagem(service, msg_id, payload):
+    """Varre o payload buscando anexos de imagem e faz o download via API."""
+    imagens = []
+    
+    def buscar_anexos(p):
+        mime = p.get("mimeType", "")
+        # Se for imagem e tiver um ID de anexo (pode ser anexo real ou inline)
+        if mime.startswith("image/"):
+            body = p.get("body", {})
+            attachment_id = body.get("attachmentId")
+            if attachment_id:
+                try:
+                    att = service.users().messages().attachments().get(
+                        userId='me', messageId=msg_id, id=attachment_id).execute()
+                    data = att.get("data")
+                    if data:
+                        img_bytes = base64.urlsafe_b64decode(data)
+                        filename = p.get("filename", "imagem")
+                        if not filename: filename = "imagem_inline"
+                        imagens.append({"filename": filename, "bytes": img_bytes, "mimeType": mime})
+                except Exception as e:
+                    pass
+        
+        # Chamada recursiva para parts
+        if "parts" in p:
+            for part in p["parts"]:
+                buscar_anexos(part)
+                
+    try:
+        buscar_anexos(payload)
+    except Exception as e:
+        pass
+        
+    return imagens
+
 
 # ==========================================
 # MÓDULOS (TELAS)
@@ -206,6 +241,21 @@ def modulo_robo_gmail():
                                     payload = msg_full.get("payload", {})
                                     texto_corpo = extrair_texto_da_mensagem(payload)
                                     st.text(texto_corpo)
+                                    
+                                    # Extrair e exibir imagens
+                                    imagens = extrair_imagens_da_mensagem(service, msg['id'], payload)
+                                    if imagens:
+                                        st.markdown("---")
+                                        st.markdown("#### 📎 Imagens Anexadas:")
+                                        # Cria colunas se tiver muitas imagens para ficar bonito
+                                        cols = st.columns(min(len(imagens), 3))
+                                        for i, img in enumerate(imagens):
+                                            with cols[i % len(cols)]:
+                                                try:
+                                                    st.image(img["bytes"], caption=img["filename"], use_container_width=True)
+                                                except Exception as e:
+                                                    st.error(f"Erro ao exibir {img['filename']}: {e}")
+                                                    
                                     
                     except Exception as e:
                         st.error(f"Ocorreu um erro durante a busca: {e}")
