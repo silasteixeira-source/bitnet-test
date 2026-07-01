@@ -191,9 +191,12 @@ def modulo_robo_gmail():
                                 
                                 try:
                                     import email.utils
+                                    from zoneinfo import ZoneInfo
                                     parsed_date = email.utils.parsedate_to_datetime(data_str)
+                                    # Converte a data do e-mail para o fuso horário do Brasil
+                                    parsed_date = parsed_date.astimezone(ZoneInfo('America/Sao_Paulo'))
                                     data_formatada = parsed_date.strftime("%d/%m/%Y %H:%M")
-                                except:
+                                except Exception as e:
                                     data_formatada = data_str
                                     
                                 titulo_expander = f"📅 {data_formatada} | 👤 {remetente} | 📌 {assunto}"
@@ -982,19 +985,6 @@ def modulo_enviador_pleito():
                 from googleapiclient.discovery import build
                 # Agora usa a credencial da sessão e não o authenticate_gmail antigo centralizado
                 gmail_service = build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
-                
-                # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
-                profile = gmail_service.users().getProfile(userId='me').execute()
-                user_email = profile.get('emailAddress', '').lower()
-                modelo = dados.get('modelo', '')
-                
-                if modelo == "BITNET" and "st1.net.br" in user_email:
-                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio ST1).")
-                    return
-                elif modelo == "ST1" and "bitinternet.com.br" in user_email:
-                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **ST1**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio BITNET).")
-                    return
-                # -------------------------------------
                 
                 msg = EmailMessage()
                 msg['To'] = email_to
