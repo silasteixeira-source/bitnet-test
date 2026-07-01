@@ -794,7 +794,11 @@ def check_oauth_callback():
                 return
             
             is_cloud = "google_auth_web" in st.secrets
-            redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501" 
+            if "oauth_redirect_uri" in st.secrets:
+                redirect_uri = st.secrets["oauth_redirect_uri"]
+            else:
+                redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501" 
+                
             flow = Flow.from_client_secrets_file(
                 web_client_file,
                 scopes=['https://www.googleapis.com/auth/gmail.send'],
@@ -834,8 +838,11 @@ def get_oauth_login_url():
         return None
     try:
         is_cloud = "google_auth_web" in st.secrets
-        redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501"
-        
+        if "oauth_redirect_uri" in st.secrets:
+            redirect_uri = st.secrets["oauth_redirect_uri"]
+        else:
+            redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501"
+            
         flow = Flow.from_client_secrets_file(
             web_client_file,
             scopes=['https://www.googleapis.com/auth/gmail.send'],
