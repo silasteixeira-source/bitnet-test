@@ -149,20 +149,42 @@ def extrair_imagens_da_mensagem(service, msg_id, payload):
     """Varre o payload buscando anexos de imagem e faz o download via API."""
     imagens = []
     
+    # 1. Encontra os CIDs válidos (imagens que aparecem ANTES de "Atenciosamente,")
+    def buscar_html(p):
+        mime = p.get("mimeType")
+        if mime == "text/html":
+            d = p.get("body", {}).get("data")
+            if d: return base64.urlsafe_b64decode(d).decode("utf-8", errors="ignore")
+        if "parts" in p:
+            for part in p["parts"]:
+                res = buscar_html(part)
+                if res: return res
+        return ""
+        
+    html = buscar_html(payload)
+    cids_validos = []
+    if html:
+        # Pega tudo antes do Atenciosamente
+        partes = re.split(r'(?i)atenciosamente,?', html)
+        html_util = partes[0]
+        cids_encontrados = re.findall(r'src=["\']cid:([^"\']+)["\']', html_util, flags=re.IGNORECASE)
+        cids_validos = [c.strip() for c in cids_encontrados]
+    
     def buscar_anexos(p):
         mime = p.get("mimeType", "")
         
-        # Filtro para ignorar assinaturas e imagens inline indesejadas
-        is_signature = False
-        if "cid" in str(p.get("filename", "")).lower():
-            is_signature = True
+        # Identifica se a imagem é inline (tem Content-ID)
+        content_id = ""
         for h in p.get("headers", []):
-            nome_header = h.get('name', '').lower()
-            valor_header = str(h.get('value', '')).lower()
-            if nome_header == 'content-id' or 'cid' in valor_header:
-                is_signature = True
+            if h.get('name', '').lower() == 'content-id':
+                content_id = str(h.get('value', '')).strip('<>')
                 
-        # Se for imagem, tiver um ID de anexo, e NÃO for uma assinatura (cid)
+        is_signature = False
+        # Se ela for uma imagem inline e o ID dela não estiver na lista de imagens antes do "Atenciosamente"
+        if content_id and content_id not in cids_validos:
+            is_signature = True
+                
+        # Se for imagem, tiver um ID de anexo, e NÃO for uma assinatura
         if not is_signature and mime.startswith("image/"):
             body = p.get("body", {})
             attachment_id = body.get("attachmentId")
@@ -174,7 +196,7 @@ def extrair_imagens_da_mensagem(service, msg_id, payload):
                     if data:
                         img_bytes = base64.urlsafe_b64decode(data)
                         filename = p.get("filename", "imagem_anexada")
-                        if not filename: filename = "imagem"
+                        if not filename: filename = f"imagem_inline_{content_id}.png"
                         imagens.append({"filename": filename, "bytes": img_bytes, "mimeType": mime})
                 except Exception as e:
                     pass
