@@ -1080,7 +1080,15 @@ def modulo_enviador_pleito():
         if 'df_escolas' in st.session_state and not st.session_state['df_escolas'].empty:
             df = st.session_state['df_escolas']
         else:
-            # Tenta ler do disco
+            
+            with st.spinner("Baixando dados do INEP diretamente do Google Sheets..."):
+                df_temp = fetch_planilha_eace()
+                if not df_temp.empty:
+                    df = df_temp
+                    st.session_state['df_escolas'] = df
+
+            if df is None or df.empty:
+                # Tenta ler do disco
             if os.path.exists("eace_cache.json"):
                 df = pd.read_json("eace_cache.json", dtype=str)
             else:
