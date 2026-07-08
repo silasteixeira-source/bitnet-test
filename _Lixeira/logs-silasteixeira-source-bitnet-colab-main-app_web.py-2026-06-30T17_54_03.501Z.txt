@@ -1,0 +1,182 @@
+
+[     UTC     ] Logs for bitnet-colaboradores.streamlit.app/
+────────────────────────────────────────────────────────────────────────────────────────
+[17:51:54] 🚀 Starting up repository: 'bitnet-colab', branch: 'main', main module: 'app_web.py'
+[17:51:54] 🐙 Cloning repository...
+[17:51:57] 🐙 Cloning into '/mount/src/bitnet-colab'...
+
+[17:51:57] 🐙 Cloned repository!
+[17:51:57] 🐙 Pulling code changes from Github...
+[17:51:58] 📦 Processing dependencies...
+
+──────────────────────────────────────── uv ───────────────────────────────────────────
+
+Using uv pip install.
+Using Python 3.14.6 environment at /home/adminuser/venv
+Resolved 62 packages in 511ms
+Prepared 62 packages in 1.80s
+Installed 62 packages in 450ms
+ + altair==6.2.2
+ + anyio==4.14.1
+ + attrs==26.1.0
+ + blinker==1.9.0
+ + cachetools==7.1.4
+ + certifi==2026.6.17[2026-06-30 17:52:01.912595] 
+ + cffi==2.0.0
+ + charset-normalizer==3.4.7
+ + click[2026-06-30 17:52:01.912828] ==8.4.2
+ + cryptography==49.0.0
+ + gitdb==4.0.12
+ + gitpython==3.1.50
+ + google-api-core==2.31.0
+ + google-api-python-client==2.198.0
+ + google-auth==2.55.1
+ + google-auth-httplib2==0.4.0[2026-06-30 17:52:01.913157] 
+ + google-auth-oauthlib==1.4.0
+ + googleapis-common-protos==1.75.0
+ + gspread==6.2.1
+ + h11==0.16.0
+ +[2026-06-30 17:52:01.913374]  httplib2==0.32.0
+ + httptools==0.8.0
+ + idna==3.18
+ + itsdangerous==2.2.0
+ + [2026-06-30 17:52:01.913629] jinja2==3.1.6
+ + jsonschema==4.26.0
+ + jsonschema-specifications==2025.9.1
+ +[2026-06-30 17:52:01.913838]  lxml==6.1.1
+ + markupsafe==3.0.3[2026-06-30 17:52:01.914022] 
+ + narwhals==2.22.1
+ + numpy==2.5.0
+ + oauthlib==3.3.1
+ +[2026-06-30 17:52:01.914188]  packaging==26.2
+ + pandas==3.0.3
+ + pillow==12.2.0
+ +[2026-06-30 17:52:01.914338]  proto-plus==1.28.0
+ + protobuf==7.35.1
+ + pyarrow==24.0.0
+ + pyasn1==[2026-06-30 17:52:01.914516] 0.6.3
+ + pyasn1-modules==0.4.2
+ + pycparser==3.0
+ +[2026-06-30 17:52:01.914683]  pydeck==0.9.2
+ + pyparsing==3.3.2
+ + python-dateutil==[2026-06-30 17:52:01.914849] 2.9.0.post0
+ + python-docx==1.2.0
+ + python-multipart==0.0.32
+ + referencing==0.37.0[2026-06-30 17:52:01.915007] 
+ + requests==2.34.2
+ + requests-oauthlib==2.0.0
+ + rpds-py==2026.6.3
+ + six==1.17.0
+ [2026-06-30 17:52:01.915162] + smmap==5.0.3
+ + starlette==1.3.1
+ + streamlit==1.58.0[2026-06-30 17:52:01.915328] 
+ + tenacity==9.1.4
+ + toml==0.10.2
+ + typing-extensions==4.15.0
+ [2026-06-30 17:52:01.915492] + uritemplate==4.2.0
+ + urllib3==2.7.0
+ + uvicorn==0.49.0
+ + watchdog==6.0.0[2026-06-30 17:52:01.915648] 
+ + websockets==16.0
+Checking if Streamlit is installed
+Found Streamlit version 1.58.0 in the environment
+Installing rich for an improved exception logging
+Using uv pip install.
+Using Python 3.14.6 environment at /home/adminuser/venv
+Resolved 4 packages in 129ms
+Prepared 4 packages in 112ms
+Installed 4 packages in 13ms
+ + markdown-it-py==4.2.0
+ + mdurl==0.1.2
+ [2026-06-30 17:52:03.754279] + pygments==2.20.0
+ + rich==15.0.0
+
+────────────────────────────────────────────────────────────────────────────────────────
+
+[17:52:04] 🐍 Python dependencies were installed from /mount/src/bitnet-colab/requirements.txt using uv.
+Check if streamlit is installed
+Streamlit is already installed
+[17:52:05] 📦 Processed dependencies!
+2026-06-30 17:52:07.398 Uvicorn server started on 0.0.0.0:8501
+
+
+
+────────────────────── Traceback (most recent call last) ───────────────────────
+  /home/adminuser/venv/lib/python3.14/site-packages/streamlit/runtime/scriptru  
+  nner/exec_code.py:129 in exec_func_with_error_handling                        
+                                                                                
+  /home/adminuser/venv/lib/python3.14/site-packages/streamlit/runtime/scriptru  
+  nner/script_runner.py:789 in code_to_exec                                     
+                                                                                
+  /mount/src/bitnet-colab/app_web.py:1029 in <module>                           
+                                                                                
+    1026 elif menu == "📝 Gerar Contrato":                                      
+    1027 │   modulo_gerador_contrato()                                          
+    1028 elif menu == "✉️ Enviador de Pleitos":                                 
+  ❱ 1029 │   modulo_enviador_pleito()                                           
+    1030 else:                                                                  
+    1031 │   st.title(menu)                                                     
+    1032 │   st.warning("Este módulo ainda está sendo migrado para a versão We  
+                                                                                
+  /mount/src/bitnet-colab/app_web.py:763 in modulo_enviador_pleito              
+                                                                                
+     760 │   │   return None                                                    
+     761                                                                        
+     762 def modulo_enviador_pleito():                                          
+  ❱  763 │   check_oauth_callback()                                             
+     764 │                                                                      
+     765 │   st.markdown("### 📄 AUTOMAÇÃO EACE (E-MAIL/DOCX)")                 
+     766 │   st.write("")                                                       
+                                                                                
+  /mount/src/bitnet-colab/app_web.py:698 in check_oauth_callback                
+                                                                                
+     695 │   # MÁGICA DA NUVEM: Cria o arquivo a partir do cofre se estiver na  
+     696 │   if not os.path.exists(web_client_file) and "google_auth_web" in s  
+     697 │   │   with open(web_client_file, "w") as f:                          
+  ❱  698 │   │   │   f.write(json.dumps(dict(st.secrets["google_auth_web"])))   
+     699 │                                                                      
+     700 │   if "code" in st.query_params and "gmail_creds" not in st.session_  
+     701 │   │   code = st.query_params["code"]                                 
+                                                                                
+  /usr/local/lib/python3.14/json/__init__.py:235 in dumps                       
+                                                                                
+    232 │   │   check_circular and allow_nan and                                
+    233 │   │   cls is None and indent is None and separators is None and       
+    234 │   │   default is None and not sort_keys and not kw):                  
+  ❱ 235 │   │   return _default_encoder.encode(obj)                             
+    236 │   if cls is None:                                                     
+    237 │   │   cls = JSONEncoder                                               
+    238 │   return cls(                                                         
+                                                                                
+  /usr/local/lib/python3.14/json/encoder.py:202 in encode                       
+                                                                                
+    199 │   │   # This doesn't pass the iterator directly to ''.join() because  
+    200 │   │   # exceptions aren't as detailed.  The list call should be roug  
+    201 │   │   # equivalent to the PySequence_Fast that ''.join() would do.    
+  ❱ 202 │   │   chunks = self.iterencode(o, _one_shot=True)                     
+    203 │   │   if not isinstance(chunks, (list, tuple)):                       
+    204 │   │   │   chunks = list(chunks)                                       
+    205 │   │   return ''.join(chunks)                                          
+                                                                                
+  /usr/local/lib/python3.14/json/encoder.py:263 in iterencode                   
+                                                                                
+    260 │   │   │   │   markers, self.default, _encoder, indent, floatstr,      
+    261 │   │   │   │   self.key_separator, self.item_separator, self.sort_key  
+    262 │   │   │   │   self.skipkeys, _one_shot)                               
+  ❱ 263 │   │   return _iterencode(o, 0)                                        
+    264                                                                         
+    265 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,   
+    266 │   │   _key_separator, _item_separator, _sort_keys, _skipkeys, _one_s  
+                                                                                
+  /usr/local/lib/python3.14/json/encoder.py:182 in default                      
+                                                                                
+    179 │   │   │   │   return super().default(o)                               
+    180 │   │                                                                   
+    181 │   │   """                                                             
+  ❱ 182 │   │   raise TypeError(f'Object of type {o.__class__.__name__} '       
+    183 │   │   │   │   │   │   f'is not JSON serializable')                    
+    184 │                                                                       
+    185 │   def encode(self, o):                                                
+────────────────────────────────────────────────────────────────────────────────
+TypeError: Object of type AttrDict is not JSON serializable
+[NOTE] when serializing dict item 'web'

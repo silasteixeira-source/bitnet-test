@@ -145,46 +145,6 @@ def extrair_texto_da_mensagem(payload):
         return f"[Erro ao extrair corpo da mensagem: {e}]"
     return "Conteúdo da mensagem não suportado ou vazio."
 
-def extrair_arquivos_da_mensagem(service, msg_id, payload):
-    """Varre o payload buscando anexos de imagem e PDF e faz o download via API."""
-    arquivos = []
-    
-    def buscar_anexos(p):
-        mime = p.get("mimeType", "")
-        
-        # Se for imagem ou PDF, e tiver um ID de anexo (inline ou real)
-        if mime.startswith("image/") or mime == "application/pdf":
-            body = p.get("body", {})
-            attachment_id = body.get("attachmentId")
-            if attachment_id:
-                try:
-                    att = service.users().messages().attachments().get(
-                        userId='me', messageId=msg_id, id=attachment_id).execute()
-                    data = att.get("data")
-                    if data:
-                        file_bytes = base64.urlsafe_b64decode(data)
-                        filename = p.get("filename", "")
-                        if not filename: 
-                            if mime == "application/pdf":
-                                filename = "anexo.pdf"
-                            else:
-                                filename = "imagem_inline.png"
-                        arquivos.append({"filename": filename, "bytes": file_bytes, "mimeType": mime})
-                except Exception as e:
-                    pass
-        
-        # Chamada recursiva para parts
-        if "parts" in p:
-            for part in p["parts"]:
-                buscar_anexos(part)
-                
-    try:
-        buscar_anexos(payload)
-    except Exception as e:
-        pass
-        
-    return arquivos
-
 
 # ==========================================
 # MÓDULOS (TELAS)
@@ -246,38 +206,6 @@ def modulo_robo_gmail():
                                     payload = msg_full.get("payload", {})
                                     texto_corpo = extrair_texto_da_mensagem(payload)
                                     st.text(texto_corpo)
-                                    
-                                    # Extrair e exibir anexos
-                                    arquivos = extrair_arquivos_da_mensagem(service, msg['id'], payload)
-                                    if arquivos:
-                                        st.markdown("---")
-                                        st.markdown("#### 📁 Anexos Deste E-mail:")
-                                        
-                                        # Separa imagens de PDFs para exibir de forma bonita
-                                        imagens = [a for a in arquivos if a["mimeType"].startswith("image/")]
-                                        pdfs = [a for a in arquivos if a["mimeType"] == "application/pdf"]
-                                        
-                                        if pdfs:
-                                            st.write("**📄 Documentos (PDF):**")
-                                            for p in pdfs:
-                                                st.download_button(
-                                                    label=f"⬇️ Baixar {p['filename']}",
-                                                    data=p['bytes'],
-                                                    file_name=p['filename'],
-                                                    mime="application/pdf",
-                                                    key=f"dl_{msg['id']}_{p['filename']}"
-                                                )
-                                                
-                                        if imagens:
-                                            st.write("**🖼️ Imagens / Prints:**")
-                                            cols = st.columns(min(len(imagens), 3))
-                                            for i, img in enumerate(imagens):
-                                                with cols[i % len(cols)]:
-                                                    try:
-                                                        st.image(img["bytes"], caption=img["filename"], use_container_width=True)
-                                                    except Exception as e:
-                                                        st.error(f"Erro ao exibir {img['filename']}: {e}")
-                                                    
                                     
                     except Exception as e:
                         st.error(f"Ocorreu um erro durante a busca: {e}")
@@ -612,129 +540,97 @@ def modulo_gerador_contrato():
 # MÓDULO 3: ENVIADOR DE PLEITOS
 # ==========================================
 
-def obter_assunto_email(dados, modelo="ST1"):
-    if modelo == "BITNET":
-        return f"ARAUJO E ALMEIDA - Pleito Alteração Solução RI - INEP {dados['inep']}"
+def obter_assunto_email(dados):
     return f"NMA SERVICOS DE TELECOMUNICAÇÕES LTDA - Alteração de RI - INEP {dados['inep']}"
 
-def obter_corpo_email_html(dados, modelo="ST1"):
+def obter_corpo_email_html(dados):
     adicionais = []
     if dados.get('qtd_switch', 0) > 0: adicionais.append(f"{dados['qtd_switch']}x Switch")
     if dados.get('qtd_rack', 0) > 0: adicionais.append(f"{dados['qtd_rack']}x Rack")
     if dados.get('qtd_nobreak', 0) > 0: adicionais.append(f"{dados['qtd_nobreak']}x Nobreak")
     
     html_adicionais = ""
-    texto_adic = ""
     if adicionais:
         texto_adic = ", ".join(adicionais)
-        if modelo == "ST1":
-            html_adicionais = f'''
-                    <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
-                        <p style="margin: 0; color: #b45309; font-size: 14px;"><strong>Adicionais de Infraestrutura:</strong><br>
-                        Além dos Access Points, a vistoria técnica identificou a necessidade de incluir os seguintes equipamentos para viabilizar a instalação: <strong>{texto_adic}</strong>.</p>
-                    </div>
-            '''
-        else:
-            html_adicionais = f'''
-            <p>Ressaltamos também que, para a viabilização da estrutura no ambiente, será necessária a implementação dos seguintes ativos adicionais: <b>{texto_adic}</b>.</p>
-            '''
+        html_adicionais = f"""
+                <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
+                    <p style="margin: 0; color: #b45309; font-size: 14px;"><strong>Adicionais de Infraestrutura:</strong><br>
+                    Além dos Access Points, a vistoria técnica identificou a necessidade de incluir os seguintes equipamentos para viabilizar a instalação: <strong>{texto_adic}</strong>.</p>
+                </div>
+        """
 
     cor_pleito = '#059669' if dados['tipo'] == 'UPGRADE' else '#dc2626'
-    
-    if modelo == "BITNET":
-        return f'''
-            <html><body style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
-                <p>Prezados,</p>
-                <p>Gostaria de solicitar a autorização da EACE para realização de <b>{dados['tipo'].lower()}</b> na quantidade de Access Points da escola abaixo:</p>
-                <ul style="line-height: 1.6;">
-                    <li><b>Escola:</b> {dados['escola']}</li>
-                    <li><b>Código INEP / Identificação:</b> {dados['inep']}</li>
-                    <li><b>Município:</b> {dados['municipio']} - {dados['uf']}</li>
-                    <li><b>Endereço:</b> {dados['endereco']}</li>
-                </ul>
-                <br>
-                <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; text-align: center; font-size: 11px; width: 100%; border-color: #cccccc;">
-                    <tr style="background-color: #f2f2f2; font-weight: bold;">
-                        <th>FASE</th><th>INEP</th><th>ESCOLA</th><th>ESTADO</th><th>CIDADE</th><th>KIT PREVISTO</th><th>PLEITO</th><th>KIT SUGERIDO</th><th>LATITUDE</th><th>LONGITUDE</th><th>ESCOLA INFANTIL</th><th>JUSTIFICATIVA</th>
-                    </tr>
-                    <tr>
-                        <td>5</td><td>{dados['inep']}</td><td>{dados['escola']}</td><td>{dados['uf']}</td><td>{dados['municipio']}</td><td>{dados['aps_atuais']}</td><td style="font-weight: bold; color: {cor_pleito};">{dados['tipo']}</td><td>{dados['novos_aps']}</td><td>{dados['latitude']}</td><td>{dados['longitude']}</td><td>{dados['escola_infantil']}</td><td>Adequação à necessidade da escola</td>
-                    </tr>
-                </table>
-                <br>
-                <p>Conforme consta na lista atual, a escola possui previsão de <b>{dados['aps_atuais']} APs</b>. Porém, após validação da necessidade do ambiente, identificamos que será necessário o <b>{dados['tipo'].lower()} para {dados['novos_aps']} APs</b>, a fim de atender de forma adequada a cobertura e o funcionamento da unidade escolar.</p>
+    return f"""
+    <html>
+    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9fafb; margin: 0; padding: 20px;">
+        <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            
+            <div style="background-color: #1e293b; padding: 20px; text-align: center;">
+                <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">SOLICITAÇÃO DE ALTERAÇÃO DE PROJETO</h2>
+            </div>
+            
+            <div style="padding: 30px;">
+                <p style="color: #334155; font-size: 15px; margin-top: 0;">Olá equipe EACE,</p>
+                <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+                    Submetemos para análise e aprovação técnica a solicitação de <strong style="color: {cor_pleito};">{dados['tipo']}</strong> de Access Points para a unidade escolar descrita abaixo.
+                </p>
+
+                <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
+                    <p style="margin: 5px 0; color: #1e293b;"><strong>Escola:</strong> {dados['escola']}</p>
+                    <p style="margin: 5px 0; color: #1e293b;"><strong>Código INEP:</strong> {dados['inep']}</p>
+                    <p style="margin: 5px 0; color: #1e293b;"><strong>Localidade:</strong> {dados['municipio']} - {dados['uf']}</p>
+                    <p style="margin: 5px 0; color: #1e293b;"><strong>Endereço:</strong> {dados['endereco']}</p>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; margin-bottom: 25px; border: 1px solid #cbd5e1;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9; color: #334155;">
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">FASE</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">INEP</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">ESCOLA</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">ESTADO</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">CIDADE</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">PREVISTO</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">PLEITO</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">SUGERIDO</th>
+                                <th style="padding: 10px; border: 1px solid #cbd5e1;">INFANTIL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="color: #475569;">
+                                <td style="padding: 10px; border: 1px solid #cbd5e1;">5</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['inep']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['escola']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['uf']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['municipio']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['aps_atuais']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; color: {cor_pleito};">{dados['tipo']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['novos_aps']}</td>
+                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['escola_infantil']}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+                    Após vistoria técnica e validação da infraestrutura local, constatamos a necessidade de adequação. O projeto original prevê <strong>{dados['aps_atuais']} AP(s)</strong>, contudo, para garantir o correto funcionamento e cobertura dos ambientes, faz-se necessária a instalação de <strong>{dados['novos_aps']} AP(s)</strong>.
+                </p>
                 {html_adicionais}
-                <p>Dessa forma, solicitamos a autorização formal da EACE para atualização da quantidade de equipamentos desta escola, passando de <b>{dados['aps_atuais']} AP</b> para <b>{dados['novos_aps']} APs</b>.</p>
-                <p>Ficamos no aguardo da aprovação para prosseguir com o atendimento em campo.</p>
-                <br>
-                <p>Atenciosamente,</p>
-                <p><b>NOC - Núcleo de Operações de Rede</b></p>
-            </body></html>
-        '''
-
-    return f'''
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #334155; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px;">
-            
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px; margin-bottom: 25px;">
-                <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Solicitação de {dados['tipo']} de APs</h2>
+                <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+                    Ficamos no aguardo da aprovação técnica formal para prosseguirmos com a execução do cronograma.
+                </p>
                 
-                <p>Prezados,</p>
-                <p>Solicitamos autorização para alteração na quantidade de Access Points (APs) da seguinte unidade escolar:</p>
-                
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #f1f5f9; font-weight: bold; width: 30%;">Escola:</td>
-                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff;">{dados['escola']}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #f1f5f9; font-weight: bold;">Código INEP:</td>
-                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff;">{dados['inep']}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #f1f5f9; font-weight: bold;">Localidade:</td>
-                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff;">{dados['municipio']} - {dados['uf']}</td>
-                    </tr>
-                </table>
+                <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                    <p style="margin: 0; color: #64748b; font-size: 14px;">Atenciosamente,</p>
+                    <p style="margin: 5px 0 0 0; color: #1e293b; font-weight: bold; font-size: 15px;">Equipe de Projetos</p>
+                    <p style="margin: 2px 0 0 0; color: #64748b; font-size: 13px;">NMA SERVIÇOS DE TELECOMUNICAÇÕES LTDA</p>
+                </div>
             </div>
-
-            <h3 style="color: #334155; margin-bottom: 15px;">Detalhes Técnicos da Solicitação</h3>
-            
-            <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <tr style="background-color: #1e293b; color: #ffffff;">
-                    <th style="padding: 12px 8px; border: 1px solid #334155;">INEP</th>
-                    <th style="padding: 12px 8px; border: 1px solid #334155;">MUNICÍPIO / UF</th>
-                    <th style="padding: 12px 8px; border: 1px solid #334155;">KIT PREVISTO</th>
-                    <th style="padding: 12px 8px; border: 1px solid #334155;">PLEITO</th>
-                    <th style="padding: 12px 8px; border: 1px solid #334155;">KIT SUGERIDO</th>
-                    <th style="padding: 12px 8px; border: 1px solid #334155;">ESCOLA INFANTIL</th>
-                </tr>
-                <tr style="background-color: #ffffff;">
-                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['inep']}</td>
-                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1;">{dados['municipio']} - {dados['uf']}</td>
-                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1;">{dados['aps_atuais']}</td>
-                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1; font-weight: bold; color: {cor_pleito};">{dados['tipo']}</td>
-                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['novos_aps']}</td>
-                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1;">{dados['escola_infantil']}</td>
-                </tr>
-            </table>
-
-            {html_adicionais}
-
-            <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin-top: 30px;">
-                <p style="margin-top: 0;"><strong>Justificativa Técnica:</strong><br>
-                Após validação criteriosa do ambiente, constatou-se que a quantidade original de <b>{dados['aps_atuais']} APs</b> não é compatível com a necessidade da escola. O {dados['tipo'].lower()} para <b>{dados['novos_aps']} APs</b> é essencial para garantir a cobertura Wi-Fi adequada e o pleno funcionamento da rede na unidade.</p>
-                <p style="margin-bottom: 0;">Ficamos no aguardo da aprovação para dar seguimento às atividades.</p>
-            </div>
-
-            <p style="margin-top: 30px; color: #64748b; font-size: 13px;">
-                Atenciosamente,<br>
-                <strong style="color: #334155;">NOC - Núcleo de Operações de Rede</strong>
-            </p>
-        </body>
-        </html>
-    '''
-
+        </div>
+    </body>
+    </html>
+    """
 
 def gerar_conteudo_docx_pleito(doc, dados):
     from docx.shared import Pt
@@ -802,111 +698,120 @@ def verificar_duplicidade_gmail(inep):
         st.warning(f"Aviso: Não foi possível checar a duplicidade de e-mail: {e}")
         return False
 
-
-
-def upload_to_drive_streamlit(buffer, filename):
-    try:
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseUpload
-        import json
-        import streamlit as st
-        
-        scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = None
-        
-        if "gcp_service_account" in st.secrets:
-            from google.oauth2.service_account import Credentials as ServiceAccountCredentials
-            creds_info = dict(st.secrets["gcp_service_account"])
-            creds = ServiceAccountCredentials.from_service_account_info(creds_info, scopes=scopes)
-        else:
-            import os
-            creds_path = os.path.join(os.getcwd(), "credentials.json")
-            if os.path.exists(creds_path):
-                from oauth2client.service_account import ServiceAccountCredentials
-                creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scopes)
-        
-        if not creds:
-            return False, "Credenciais do Google Drive não configuradas."
+def check_oauth_callback():
+    from google_auth_oauthlib.flow import Flow
+    import os
+    import json
+    
+    web_client_file = "AuthWebLocal.json"
+    
+    # MÁGICA DA NUVEM: Cria o arquivo a partir do cofre se estiver na web
+    if not os.path.exists(web_client_file) and "google_auth_web" in st.secrets:
+        auth_web = dict(st.secrets["google_auth_web"])
+        if "web" in auth_web:
+            auth_web["web"] = dict(auth_web["web"])
+        with open(web_client_file, "w") as f:
+            f.write(json.dumps(auth_web))
             
-        drive_service = build('drive', 'v3', credentials=creds)
-        
+    if "code" in st.query_params and "gmail_creds" not in st.session_state:
+        code = st.query_params["code"]
+        state = st.query_params.get("state", None)
         try:
-            folder_id = st.secrets["GOOGLE_DRIVE_FOLDER_ID"]
-        except:
-            folder_id = "1RSsspBObpQe5S30o0L3YzpyY9AjpfwKj"
+            if not os.path.exists(web_client_file):
+                st.error("Arquivo AuthWebLocal.json não encontrado. Configure-o primeiro.")
+                return
             
-        file_metadata = {'name': filename, 'parents': [folder_id]}
-        media = MediaIoBaseUpload(buffer, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document', resumable=True)
-        drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        return True, "Enviado com sucesso"
-    except Exception as e:
-        return False, str(e)
+            is_cloud = "google_auth_web" in st.secrets
+            redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501" 
+            flow = Flow.from_client_secrets_file(
+                web_client_file,
+                scopes=['https://www.googleapis.com/auth/gmail.send'],
+                redirect_uri=redirect_uri
+            )
+            
+            # Restaurar o code_verifier (PKCE) da memoria em disco
+            if os.path.exists("oauth_state.json"):
+                with open("oauth_state.json", "r") as f:
+                    saved = json.load(f)
+                    if saved.get("state") == state and saved.get("code_verifier"):
+                        flow.code_verifier = saved["code_verifier"]
+            
+            flow.fetch_token(code=code)
+            st.session_state["gmail_creds"] = flow.credentials
+            
+            st.query_params.clear()
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro na autenticação: {e}")
+
+def get_oauth_login_url():
+    from google_auth_oauthlib.flow import Flow
+    import os
+    import json
+    web_client_file = "AuthWebLocal.json"
+    
+    # MÁGICA DA NUVEM: Cria o arquivo a partir do cofre se estiver na web
+    if not os.path.exists(web_client_file) and "google_auth_web" in st.secrets:
+        auth_web = dict(st.secrets["google_auth_web"])
+        if "web" in auth_web:
+            auth_web["web"] = dict(auth_web["web"])
+        with open(web_client_file, "w") as f:
+            f.write(json.dumps(auth_web))
+            
+    if not os.path.exists(web_client_file):
+        return None
+    try:
+        is_cloud = "google_auth_web" in st.secrets
+        redirect_uri = "https://bitnet-colaboradores.streamlit.app" if is_cloud else "http://localhost:8501"
+        
+        flow = Flow.from_client_secrets_file(
+            web_client_file,
+            scopes=['https://www.googleapis.com/auth/gmail.send'],
+            redirect_uri=redirect_uri
+        )
+        auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
+        
+        # Salvar o code_verifier no disco pois a sessão é perdida no redirecionamento
+        with open("oauth_state.json", "w") as f:
+            json.dump({
+                "state": state,
+                "code_verifier": getattr(flow, 'code_verifier', None)
+            }, f)
+            
+        return auth_url
+    except Exception:
+        return None
 
 def modulo_enviador_pleito():
-    st.error("🛑 **ACESSO RESTRITO**")
-    st.warning("Este módulo é de uso restrito e autorizado **APENAS** para pessoas expressamente designadas para o envio oficial de e-mails do NOC. Se você não possui autorização, não utilize esta funcionalidade.")
-    st.markdown("---")
+    st.markdown("### 🚧 Módulo em Desenvolvimento")
+    st.warning("O Enviador de Pleitos na Nuvem está passando por adequações de segurança (OAuth) junto ao Google Cloud e se encontra temporariamente bloqueado para a equipe.")
+    st.info("Por favor, continue utilizando a versão Desktop (`.exe`) original para o envio de pleitos enquanto estabilizamos a versão Nuvem.")
+    return
+    
+    check_oauth_callback()
     
     st.markdown("### 📄 AUTOMAÇÃO EACE (E-MAIL/DOCX)")
     st.write("")
     
-    
-    # SELETOR DE MODELOS
-    if 'modelo_pleito' not in st.session_state:
-        st.session_state['modelo_pleito'] = "ST1"
-        
-    modelo_pleito = st.radio("Selecione o Modelo de Contrato/Pleito:", ["ST1", "BITNET"], horizontal=True, index=0 if st.session_state.get('modelo_pleito', 'ST1') == "ST1" else 1)
-    st.session_state['modelo_pleito'] = modelo_pleito
-    
-    st.divider()
-
     # AUTENTICAÇÃO OBRIGATÓRIA (OAuth)
-    if "gmail_creds" not in st.session_state:
-        from google.oauth2.credentials import Credentials
-        # 1. Tenta carregar dos Secrets da nuvem (Bypass do OAuth bloqueado)
-        if "google_auth_token_envio" in st.secrets:
-            try:
-                creds = Credentials.from_authorized_user_info(dict(st.secrets["google_auth_token_envio"]), ['https://www.googleapis.com/auth/gmail.send'])
-                if creds and creds.valid:
-                    st.session_state["gmail_creds"] = creds
-            except Exception:
-                pass
-        
-        # 2. Tenta carregar do disco (uso local)
-        elif os.path.exists("token_envio.json"):
-            try:
-                creds = Credentials.from_authorized_user_file("token_envio.json", ['https://www.googleapis.com/auth/gmail.send'])
-                if creds and creds.valid:
-                    st.session_state["gmail_creds"] = creds
-            except Exception:
-                pass
-                
     if "gmail_creds" not in st.session_state or not st.session_state["gmail_creds"].valid:
         st.info("🔒 Para continuar, você precisa fazer login com sua conta do Google para enviar os e-mails em seu próprio nome.")
-        
-        token_upload = st.file_uploader("Alternativa: Faça upload do arquivo 'meu_token_envio.json' gerado localmente (Pula verificação do Google)", type=["json"])
-        if token_upload:
-            try:
-                import json
-                from google.oauth2.credentials import Credentials
-                token_data = json.load(token_upload)
-                creds = Credentials.from_authorized_user_info(token_data, ['https://www.googleapis.com/auth/gmail.send'])
-                if creds and creds.valid:
-                    st.session_state["gmail_creds"] = creds
-                    st.success("✅ Token local carregado com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("❌ O token enviado é inválido ou está expirado.")
-            except Exception as e:
-                st.error(f"Erro ao ler o token: {e}")
-        
-
+        login_url = get_oauth_login_url()
+        if login_url:
+            st.markdown(f'<a href="{login_url}" target="_self"><button style="padding:10px 20px; font-weight:bold; background-color:#4285F4; color:white; border:none; border-radius:5px; cursor:pointer;">🔑 Fazer Login com o Google</button></a>', unsafe_allow_html=True)
+        else:
+            st.error("⚠️ Erro Crítico: O arquivo 'AuthWebLocal.json' (Web Application Client ID) não foi encontrado na pasta. Siga as instruções do GCP para criá-lo.")
+        return
         
     st.success("✅ Logado com sucesso! Seus e-mails serão enviados em seu nome.")
     st.write("")
     
-    
-
+    # SELETOR DE MODELOS
+    modelo_pleito = st.radio("Selecione o Modelo de Contrato/Pleito:", ["ST1", "BITNET"], horizontal=True)
+    if modelo_pleito == "BITNET":
+        st.info("🚧 **Em Desenvolvimento** - O modelo BITNET ainda está em processo de criação de layout de e-mail e mensagens.")
+        return
+    st.divider()
     
     # GERENCIADOR DE EMAILS PADRÃO
     import json
@@ -982,20 +887,12 @@ def modulo_enviador_pleito():
         if 'df_escolas' in st.session_state and not st.session_state['df_escolas'].empty:
             df = st.session_state['df_escolas']
         else:
-            
-            with st.spinner("Baixando dados do INEP diretamente do Google Sheets..."):
-                df_temp = fetch_planilha_eace()
-                if not df_temp.empty:
-                    df = df_temp
-                    st.session_state['df_escolas'] = df
-
-            if df is None or df.empty:
-                # Tenta ler do disco
-                if os.path.exists("eace_cache.json"):
-                    df = pd.read_json("eace_cache.json", dtype=str)
-                else:
-                    st.error("Banco de dados 'eace_cache.json' não encontrado na pasta! Vá na aba Consulta EACE e carregue a planilha para gerar o cache.")
-                    return None
+            # Tenta ler do disco
+            if os.path.exists("eace_cache.json"):
+                df = pd.read_json("eace_cache.json", dtype=str)
+            else:
+                st.error("Banco de dados 'eace_cache.json' não encontrado na pasta! Vá na aba Consulta EACE e carregue a planilha para gerar o cache.")
+                return None
                 
         col_name = "Código INEP" if "Código INEP" in df.columns else df.columns[0]
         df_copy = df.copy()
@@ -1049,7 +946,7 @@ def modulo_enviador_pleito():
     if btn_prev:
         dados = buscar_dados_locais()
         if dados:
-            html_preview = obter_corpo_email_html(dados, st.session_state.get("modelo_pleito", "ST1"))
+            html_preview = obter_corpo_email_html(dados)
             exibir_popup_email(html_preview)
             
     if btn_baixar:
@@ -1060,15 +957,23 @@ def modulo_enviador_pleito():
                 gerar_conteudo_docx_pleito(doc_pleito, dados)
                 buffer = io.BytesIO()
                 doc_pleito.save(buffer)
-                nome_arquivo = f"Pleito_{dados['inep']}.docx"
-                st.info("Fazendo upload para o Google Drive...")
-                ok, msg = upload_to_drive_streamlit(buffer, nome_arquivo)
-                if ok:
-                    st.success(f"✅ DOCX enviado para o Google Drive com sucesso! ({nome_arquivo})")
-                else:
-                    st.error(f"⚠️ Erro ao enviar para o Drive: {msg}")
+                buffer.seek(0)
+                st.session_state['pleito_docx_buffer'] = buffer
+                st.session_state['pleito_docx_name'] = f"Pleito_{dados['inep']}.docx"
+                st.success("✅ DOCX processado com sucesso!")
             except Exception as e:
                 st.error(f"Erro ao processar DOCX: {e}")
+                
+    # Na Web o Download Button real precisa renderizar
+    if 'pleito_docx_buffer' in st.session_state:
+        st.download_button(
+            label="⬇️ CLIQUE AQUI PARA SALVAR O ARQUIVO NO PC",
+            data=st.session_state['pleito_docx_buffer'],
+            file_name=st.session_state['pleito_docx_name'],
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            type="primary",
+            use_container_width=True
+        )
             
     if btn_enviar:
         dados = buscar_dados_locais()
@@ -1081,27 +986,11 @@ def modulo_enviador_pleito():
                 # Agora usa a credencial da sessão e não o authenticate_gmail antigo centralizado
                 gmail_service = build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
                 
-                # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
-                try:
-                    profile = gmail_service.users().getProfile(userId='me').execute()
-                    user_email = profile.get('emailAddress', '').lower()
-                except Exception:
-                    user_email = "desconhecido"
-                modelo = st.session_state.get('modelo_pleito', 'ST1')
-                
-                if modelo == "BITNET" and "st1.net.br" in user_email:
-                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio ST1).")
-                    return
-                elif modelo == "ST1" and "bitinternet.com.br" in user_email:
-                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **ST1**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio BITNET).")
-                    return
-                # -------------------------------------
-                
                 msg = EmailMessage()
                 msg['To'] = email_to
                 if email_cc: msg['Cc'] = email_cc
-                msg['Subject'] = obter_assunto_email(dados, modelo)
-                msg.add_alternative(obter_corpo_email_html(dados, modelo), subtype='html')
+                msg['Subject'] = obter_assunto_email(dados)
+                msg.add_alternative(obter_corpo_email_html(dados), subtype='html')
                 
                 # Anexos
                 if anexos_upload:
