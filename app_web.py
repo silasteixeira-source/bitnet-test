@@ -974,6 +974,25 @@ def modulo_enviador_pleito():
                 
     if "gmail_creds" not in st.session_state or not st.session_state["gmail_creds"].valid:
         st.info("🔒 Para continuar, você precisa fazer login com sua conta do Google para enviar os e-mails em seu próprio nome.")
+        
+        token_upload = st.file_uploader("Alternativa: Faça upload do arquivo 'meu_token_envio.json' gerado localmente (Pula verificação do Google)", type=["json"])
+        if token_upload:
+            try:
+                import json
+                from google.oauth2.credentials import Credentials
+                token_data = json.load(token_upload)
+                creds = Credentials.from_authorized_user_info(token_data, ['https://www.googleapis.com/auth/gmail.send'])
+                if creds and creds.valid:
+                    st.session_state["gmail_creds"] = creds
+                    st.success("✅ Token local carregado com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("❌ O token enviado é inválido ou está expirado.")
+            except Exception as e:
+                st.error(f"Erro ao ler o token: {e}")
+        
+        st.markdown("---")
+        st.write("Ou clique abaixo para o Login Web (pode estar restrito/dar Erro 403 se o e-mail não estiver na lista):")
         login_url = get_oauth_login_url()
         if login_url:
             st.markdown(f'<a href="{login_url}" target="_self"><button style="padding:10px 20px; font-weight:bold; background-color:#4285F4; color:white; border:none; border-radius:5px; cursor:pointer;">🔑 Fazer Login com o Google</button></a>', unsafe_allow_html=True)
