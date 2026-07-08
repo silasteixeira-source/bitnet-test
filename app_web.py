@@ -1089,11 +1089,11 @@ def modulo_enviador_pleito():
 
             if df is None or df.empty:
                 # Tenta ler do disco
-            if os.path.exists("eace_cache.json"):
-                df = pd.read_json("eace_cache.json", dtype=str)
-            else:
-                st.error("Banco de dados 'eace_cache.json' não encontrado na pasta! Vá na aba Consulta EACE e carregue a planilha para gerar o cache.")
-                return None
+                if os.path.exists("eace_cache.json"):
+                    df = pd.read_json("eace_cache.json", dtype=str)
+                else:
+                    st.error("Banco de dados 'eace_cache.json' não encontrado na pasta! Vá na aba Consulta EACE e carregue a planilha para gerar o cache.")
+                    return None
                 
         col_name = "Código INEP" if "Código INEP" in df.columns else df.columns[0]
         df_copy = df.copy()
