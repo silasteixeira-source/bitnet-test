@@ -1180,8 +1180,11 @@ def modulo_enviador_pleito():
                 gmail_service = build('gmail', 'v1', credentials=st.session_state["gmail_creds"])
                 
                 # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
-                profile = gmail_service.users().getProfile(userId='me').execute()
-                user_email = profile.get('emailAddress', '').lower()
+                try:
+                    profile = gmail_service.users().getProfile(userId='me').execute()
+                    user_email = profile.get('emailAddress', '').lower()
+                except Exception:
+                    user_email = "desconhecido"
                 modelo = st.session_state.get('modelo_pleito', 'ST1')
                 
                 if modelo == "BITNET" and "st1.net.br" in user_email:
