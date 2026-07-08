@@ -902,6 +902,8 @@ def modulo_enviador_pleito():
                 st.error(f"Erro ao ler o token: {e}")
         
 
+    if "gmail_creds" not in st.session_state:
+        return
         
     st.success("✅ Logado com sucesso! Seus e-mails serão enviados em seu nome.")
     st.write("")
