@@ -846,6 +846,7 @@ def modulo_enviador_pleito():
     st.error("🛑 **ACESSO RESTRITO**")
     st.warning("Este módulo é de uso restrito e autorizado **APENAS** para pessoas expressamente designadas para o envio oficial de e-mails do NOC. Se você não possui autorização, não utilize esta funcionalidade.")
     st.markdown("---")
+
     
     st.markdown("### 📄 AUTOMAÇÃO EACE (E-MAIL/DOCX)")
     st.write("")
