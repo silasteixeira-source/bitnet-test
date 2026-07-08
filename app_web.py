@@ -1198,8 +1198,8 @@ def modulo_enviador_pleito():
                 msg = EmailMessage()
                 msg['To'] = email_to
                 if email_cc: msg['Cc'] = email_cc
-                msg['Subject'] = obter_assunto_email(dados)
-                msg.add_alternative(obter_corpo_email_html(dados), subtype='html')
+                msg['Subject'] = obter_assunto_email(dados, modelo)
+                msg.add_alternative(obter_corpo_email_html(dados, modelo), subtype='html')
                 
                 # Anexos
                 if anexos_upload:
