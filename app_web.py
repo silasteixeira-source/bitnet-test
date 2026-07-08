@@ -612,97 +612,129 @@ def modulo_gerador_contrato():
 # MÓDULO 3: ENVIADOR DE PLEITOS
 # ==========================================
 
-def obter_assunto_email(dados):
+def obter_assunto_email(dados, modelo="ST1"):
+    if modelo == "BITNET":
+        return f"ARAUJO E ALMEIDA - Pleito Alteração Solução RI - INEP {dados['inep']}"
     return f"NMA SERVICOS DE TELECOMUNICAÇÕES LTDA - Alteração de RI - INEP {dados['inep']}"
 
-def obter_corpo_email_html(dados):
+def obter_corpo_email_html(dados, modelo="ST1"):
     adicionais = []
     if dados.get('qtd_switch', 0) > 0: adicionais.append(f"{dados['qtd_switch']}x Switch")
     if dados.get('qtd_rack', 0) > 0: adicionais.append(f"{dados['qtd_rack']}x Rack")
     if dados.get('qtd_nobreak', 0) > 0: adicionais.append(f"{dados['qtd_nobreak']}x Nobreak")
     
     html_adicionais = ""
+    texto_adic = ""
     if adicionais:
         texto_adic = ", ".join(adicionais)
-        html_adicionais = f"""
-                <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
-                    <p style="margin: 0; color: #b45309; font-size: 14px;"><strong>Adicionais de Infraestrutura:</strong><br>
-                    Além dos Access Points, a vistoria técnica identificou a necessidade de incluir os seguintes equipamentos para viabilizar a instalação: <strong>{texto_adic}</strong>.</p>
-                </div>
-        """
+        if modelo == "ST1":
+            html_adicionais = f'''
+                    <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
+                        <p style="margin: 0; color: #b45309; font-size: 14px;"><strong>Adicionais de Infraestrutura:</strong><br>
+                        Além dos Access Points, a vistoria técnica identificou a necessidade de incluir os seguintes equipamentos para viabilizar a instalação: <strong>{texto_adic}</strong>.</p>
+                    </div>
+            '''
+        else:
+            html_adicionais = f'''
+            <p>Ressaltamos também que, para a viabilização da estrutura no ambiente, será necessária a implementação dos seguintes ativos adicionais: <b>{texto_adic}</b>.</p>
+            '''
 
     cor_pleito = '#059669' if dados['tipo'] == 'UPGRADE' else '#dc2626'
-    return f"""
-    <html>
-    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9fafb; margin: 0; padding: 20px;">
-        <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-            
-            <div style="background-color: #1e293b; padding: 20px; text-align: center;">
-                <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">SOLICITAÇÃO DE ALTERAÇÃO DE PROJETO</h2>
-            </div>
-            
-            <div style="padding: 30px;">
-                <p style="color: #334155; font-size: 15px; margin-top: 0;">Olá equipe EACE,</p>
-                <p style="color: #334155; font-size: 15px; line-height: 1.6;">
-                    Submetemos para análise e aprovação técnica a solicitação de <strong style="color: {cor_pleito};">{dados['tipo']}</strong> de Access Points para a unidade escolar descrita abaixo.
-                </p>
-
-                <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin: 25px 0; border-radius: 0 4px 4px 0;">
-                    <p style="margin: 5px 0; color: #1e293b;"><strong>Escola:</strong> {dados['escola']}</p>
-                    <p style="margin: 5px 0; color: #1e293b;"><strong>Código INEP:</strong> {dados['inep']}</p>
-                    <p style="margin: 5px 0; color: #1e293b;"><strong>Localidade:</strong> {dados['municipio']} - {dados['uf']}</p>
-                    <p style="margin: 5px 0; color: #1e293b;"><strong>Endereço:</strong> {dados['endereco']}</p>
-                </div>
-
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; margin-bottom: 25px; border: 1px solid #cbd5e1;">
-                        <thead>
-                            <tr style="background-color: #f1f5f9; color: #334155;">
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">FASE</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">INEP</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">ESCOLA</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">ESTADO</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">CIDADE</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">PREVISTO</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">PLEITO</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">SUGERIDO</th>
-                                <th style="padding: 10px; border: 1px solid #cbd5e1;">INFANTIL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="color: #475569;">
-                                <td style="padding: 10px; border: 1px solid #cbd5e1;">5</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['inep']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['escola']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['uf']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['municipio']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['aps_atuais']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; color: {cor_pleito};">{dados['tipo']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['novos_aps']}</td>
-                                <td style="padding: 10px; border: 1px solid #cbd5e1;">{dados['escola_infantil']}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <p style="color: #334155; font-size: 15px; line-height: 1.6;">
-                    Após vistoria técnica e validação da infraestrutura local, constatamos a necessidade de adequação. O projeto original prevê <strong>{dados['aps_atuais']} AP(s)</strong>, contudo, para garantir o correto funcionamento e cobertura dos ambientes, faz-se necessária a instalação de <strong>{dados['novos_aps']} AP(s)</strong>.
-                </p>
+    
+    if modelo == "BITNET":
+        return f'''
+            <html><body style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
+                <p>Prezados,</p>
+                <p>Gostaria de solicitar a autorização da EACE para realização de <b>{dados['tipo'].lower()}</b> na quantidade de Access Points da escola abaixo:</p>
+                <ul style="line-height: 1.6;">
+                    <li><b>Escola:</b> {dados['escola']}</li>
+                    <li><b>Código INEP / Identificação:</b> {dados['inep']}</li>
+                    <li><b>Município:</b> {dados['municipio']} - {dados['uf']}</li>
+                    <li><b>Endereço:</b> {dados['endereco']}</li>
+                </ul>
+                <br>
+                <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; text-align: center; font-size: 11px; width: 100%; border-color: #cccccc;">
+                    <tr style="background-color: #f2f2f2; font-weight: bold;">
+                        <th>FASE</th><th>INEP</th><th>ESCOLA</th><th>ESTADO</th><th>CIDADE</th><th>KIT PREVISTO</th><th>PLEITO</th><th>KIT SUGERIDO</th><th>LATITUDE</th><th>LONGITUDE</th><th>ESCOLA INFANTIL</th><th>JUSTIFICATIVA</th>
+                    </tr>
+                    <tr>
+                        <td>5</td><td>{dados['inep']}</td><td>{dados['escola']}</td><td>{dados['uf']}</td><td>{dados['municipio']}</td><td>{dados['aps_atuais']}</td><td style="font-weight: bold; color: {cor_pleito};">{dados['tipo']}</td><td>{dados['novos_aps']}</td><td>{dados['latitude']}</td><td>{dados['longitude']}</td><td>{dados['escola_infantil']}</td><td>Adequação à necessidade da escola</td>
+                    </tr>
+                </table>
+                <br>
+                <p>Conforme consta na lista atual, a escola possui previsão de <b>{dados['aps_atuais']} APs</b>. Porém, após validação da necessidade do ambiente, identificamos que será necessário o <b>{dados['tipo'].lower()} para {dados['novos_aps']} APs</b>, a fim de atender de forma adequada a cobertura e o funcionamento da unidade escolar.</p>
                 {html_adicionais}
-                <p style="color: #334155; font-size: 15px; line-height: 1.6;">
-                    Ficamos no aguardo da aprovação técnica formal para prosseguirmos com a execução do cronograma.
-                </p>
+                <p>Dessa forma, solicitamos a autorização formal da EACE para atualização da quantidade de equipamentos desta escola, passando de <b>{dados['aps_atuais']} AP</b> para <b>{dados['novos_aps']} APs</b>.</p>
+                <p>Ficamos no aguardo da aprovação para prosseguir com o atendimento em campo.</p>
+                <br>
+                <p>Atenciosamente,</p>
+                <p><b>NOC - Núcleo de Operações de Rede</b></p>
+            </body></html>
+        '''
+
+    return f'''
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #334155; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px;">
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px; margin-bottom: 25px;">
+                <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Solicitação de {dados['tipo']} de APs</h2>
                 
-                <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                    <p style="margin: 0; color: #64748b; font-size: 14px;">Atenciosamente,</p>
-                    <p style="margin: 5px 0 0 0; color: #1e293b; font-weight: bold; font-size: 15px;">Equipe de Projetos</p>
-                    <p style="margin: 2px 0 0 0; color: #64748b; font-size: 13px;">NMA SERVIÇOS DE TELECOMUNICAÇÕES LTDA</p>
-                </div>
+                <p>Prezados,</p>
+                <p>Solicitamos autorização para alteração na quantidade de Access Points (APs) da seguinte unidade escolar:</p>
+                
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #f1f5f9; font-weight: bold; width: 30%;">Escola:</td>
+                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff;">{dados['escola']}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #f1f5f9; font-weight: bold;">Código INEP:</td>
+                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff;">{dados['inep']}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #f1f5f9; font-weight: bold;">Localidade:</td>
+                        <td style="padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff;">{dados['municipio']} - {dados['uf']}</td>
+                    </tr>
+                </table>
             </div>
-        </div>
-    </body>
-    </html>
-    """
+
+            <h3 style="color: #334155; margin-bottom: 15px;">Detalhes Técnicos da Solicitação</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <tr style="background-color: #1e293b; color: #ffffff;">
+                    <th style="padding: 12px 8px; border: 1px solid #334155;">INEP</th>
+                    <th style="padding: 12px 8px; border: 1px solid #334155;">MUNICÍPIO / UF</th>
+                    <th style="padding: 12px 8px; border: 1px solid #334155;">KIT PREVISTO</th>
+                    <th style="padding: 12px 8px; border: 1px solid #334155;">PLEITO</th>
+                    <th style="padding: 12px 8px; border: 1px solid #334155;">KIT SUGERIDO</th>
+                    <th style="padding: 12px 8px; border: 1px solid #334155;">ESCOLA INFANTIL</th>
+                </tr>
+                <tr style="background-color: #ffffff;">
+                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['inep']}</td>
+                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1;">{dados['municipio']} - {dados['uf']}</td>
+                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1;">{dados['aps_atuais']}</td>
+                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1; font-weight: bold; color: {cor_pleito};">{dados['tipo']}</td>
+                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1; font-weight: bold;">{dados['novos_aps']}</td>
+                    <td style="padding: 12px 8px; border: 1px solid #cbd5e1;">{dados['escola_infantil']}</td>
+                </tr>
+            </table>
+
+            {html_adicionais}
+
+            <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin-top: 30px;">
+                <p style="margin-top: 0;"><strong>Justificativa Técnica:</strong><br>
+                Após validação criteriosa do ambiente, constatou-se que a quantidade original de <b>{dados['aps_atuais']} APs</b> não é compatível com a necessidade da escola. O {dados['tipo'].lower()} para <b>{dados['novos_aps']} APs</b> é essencial para garantir a cobertura Wi-Fi adequada e o pleno funcionamento da rede na unidade.</p>
+                <p style="margin-bottom: 0;">Ficamos no aguardo da aprovação para dar seguimento às atividades.</p>
+            </div>
+
+            <p style="margin-top: 30px; color: #64748b; font-size: 13px;">
+                Atenciosamente,<br>
+                <strong style="color: #334155;">NOC - Núcleo de Operações de Rede</strong>
+            </p>
+        </body>
+        </html>
+    '''
+
 
 def gerar_conteudo_docx_pleito(doc, dados):
     from docx.shared import Pt
@@ -861,6 +893,45 @@ def get_oauth_login_url():
     except Exception:
         return None
 
+
+def upload_to_drive_streamlit(buffer, filename):
+    try:
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseUpload
+        import json
+        import streamlit as st
+        
+        scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = None
+        
+        if "gcp_service_account" in st.secrets:
+            from google.oauth2.service_account import Credentials as ServiceAccountCredentials
+            creds_info = dict(st.secrets["gcp_service_account"])
+            creds = ServiceAccountCredentials.from_service_account_info(creds_info, scopes=scopes)
+        else:
+            import os
+            creds_path = os.path.join(os.getcwd(), "credentials.json")
+            if os.path.exists(creds_path):
+                from oauth2client.service_account import ServiceAccountCredentials
+                creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scopes)
+        
+        if not creds:
+            return False, "Credenciais do Google Drive não configuradas."
+            
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        try:
+            folder_id = st.secrets["GOOGLE_DRIVE_FOLDER_ID"]
+        except:
+            folder_id = "1RSsspBObpQe5S30o0L3YzpyY9AjpfwKj"
+            
+        file_metadata = {'name': filename, 'parents': [folder_id]}
+        media = MediaIoBaseUpload(buffer, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document', resumable=True)
+        drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        return True, "Enviado com sucesso"
+    except Exception as e:
+        return False, str(e)
+
 def modulo_enviador_pleito():
     st.error("🛑 **ACESSO RESTRITO**")
     st.warning("Este módulo é de uso restrito e autorizado **APENAS** para pessoas expressamente designadas para o envio oficial de e-mails do NOC. Se você não possui autorização, não utilize esta funcionalidade.")
@@ -870,6 +941,16 @@ def modulo_enviador_pleito():
     st.markdown("### 📄 AUTOMAÇÃO EACE (E-MAIL/DOCX)")
     st.write("")
     
+    
+    # SELETOR DE MODELOS
+    if 'modelo_pleito' not in st.session_state:
+        st.session_state['modelo_pleito'] = "ST1"
+        
+    modelo_pleito = st.radio("Selecione o Modelo de Contrato/Pleito:", ["ST1", "BITNET"], horizontal=True, index=0 if st.session_state.get('modelo_pleito', 'ST1') == "ST1" else 1)
+    st.session_state['modelo_pleito'] = modelo_pleito
+    
+    st.divider()
+
     # AUTENTICAÇÃO OBRIGATÓRIA (OAuth)
     if "gmail_creds" not in st.session_state:
         from google.oauth2.credentials import Credentials
@@ -903,12 +984,8 @@ def modulo_enviador_pleito():
     st.success("✅ Logado com sucesso! Seus e-mails serão enviados em seu nome.")
     st.write("")
     
-    # SELETOR DE MODELOS
-    modelo_pleito = st.radio("Selecione o Modelo de Contrato/Pleito:", ["ST1", "BITNET"], horizontal=True)
-    if modelo_pleito == "BITNET":
-        st.info("🚧 **Em Desenvolvimento** - O modelo BITNET ainda está em processo de criação de layout de e-mail e mensagens.")
-        return
-    st.divider()
+    
+
     
     # GERENCIADOR DE EMAILS PADRÃO
     import json
@@ -1043,7 +1120,7 @@ def modulo_enviador_pleito():
     if btn_prev:
         dados = buscar_dados_locais()
         if dados:
-            html_preview = obter_corpo_email_html(dados)
+            html_preview = obter_corpo_email_html(dados, st.session_state.get("modelo_pleito", "ST1"))
             exibir_popup_email(html_preview)
             
     if btn_baixar:
@@ -1054,23 +1131,15 @@ def modulo_enviador_pleito():
                 gerar_conteudo_docx_pleito(doc_pleito, dados)
                 buffer = io.BytesIO()
                 doc_pleito.save(buffer)
-                buffer.seek(0)
-                st.session_state['pleito_docx_buffer'] = buffer
-                st.session_state['pleito_docx_name'] = f"Pleito_{dados['inep']}.docx"
-                st.success("✅ DOCX processado com sucesso!")
+                nome_arquivo = f"Pleito_{dados['inep']}.docx"
+                st.info("Fazendo upload para o Google Drive...")
+                ok, msg = upload_to_drive_streamlit(buffer, nome_arquivo)
+                if ok:
+                    st.success(f"✅ DOCX enviado para o Google Drive com sucesso! ({nome_arquivo})")
+                else:
+                    st.error(f"⚠️ Erro ao enviar para o Drive: {msg}")
             except Exception as e:
                 st.error(f"Erro ao processar DOCX: {e}")
-                
-    # Na Web o Download Button real precisa renderizar
-    if 'pleito_docx_buffer' in st.session_state:
-        st.download_button(
-            label="⬇️ CLIQUE AQUI PARA SALVAR O ARQUIVO NO PC",
-            data=st.session_state['pleito_docx_buffer'],
-            file_name=st.session_state['pleito_docx_name'],
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            type="primary",
-            use_container_width=True
-        )
             
     if btn_enviar:
         dados = buscar_dados_locais()
@@ -1086,7 +1155,7 @@ def modulo_enviador_pleito():
                 # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
                 profile = gmail_service.users().getProfile(userId='me').execute()
                 user_email = profile.get('emailAddress', '').lower()
-                modelo = dados.get('modelo', '')
+                modelo = st.session_state.get('modelo_pleito', 'ST1')
                 
                 if modelo == "BITNET" and "st1.net.br" in user_email:
                     st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio ST1).")
