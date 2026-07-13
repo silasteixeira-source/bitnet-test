@@ -3395,10 +3395,10 @@ class GerenciadorTokensApp:
                 flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES_GMAIL)
                 creds = flow.run_local_server(port=0)
                 
-                # Buscar email
-                svc = build('gmail', 'v1', credentials=creds)
-                perfil = svc.users().getProfile(userId='me').execute()
-                email = perfil.get('emailAddress', 'desconhecido').lower()
+                # Buscar email via oauth2 para não exigir escopo de leitura do gmail
+                svc_oauth = build('oauth2', 'v2', credentials=creds)
+                user_info = svc_oauth.userinfo().get().execute()
+                email = user_info.get('email', 'desconhecido').lower()
                 
                 downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
                 token_filename = os.path.join(downloads_folder, f"token_envio_{email}.json")
