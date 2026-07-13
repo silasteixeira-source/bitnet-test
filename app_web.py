@@ -106,6 +106,43 @@ def fetch_planilha_eace():
         st.error(f"Erro ao baixar dados da aba EACE: {e}")
         return pd.DataFrame()
 
+def registrar_up_down_planilha(dados):
+    gspread_client = authenticate_google_sheets()
+    if not gspread_client: return False
+    try:
+        SPREADSHEET_ID = "1Onw1vaSO2SIQ_OfAoDPI6ycnXWTAZ2ijhtujAOhI9UM"
+        spreadsheet = gspread_client.open_by_key(SPREADSHEET_ID)
+        
+        try:
+            ws = spreadsheet.worksheet("UP_DOWN")
+        except gspread.exceptions.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title="UP_DOWN", rows="1000", cols="10")
+            ws.append_row(["INEP", "Escola", "Status", "Tipo", "Kit Previsto", "Kit Sugerido", "Observação", "OBS EACE"])
+            
+        inep = str(dados.get('inep', ''))
+        row_data = [
+            inep,
+            str(dados.get('escola', '')),
+            "Aguardando EACE",
+            str(dados.get('tipo', '')),
+            str(dados.get('aps_atuais', '')),
+            str(dados.get('novos_aps', '')),
+            "",
+            ""
+        ]
+        
+        ineps_col = ws.col_values(1)
+        if inep in ineps_col:
+            row_idx = ineps_col.index(inep) + 1
+            cell_range = f"A{row_idx}:H{row_idx}"
+            ws.update(cell_range, [row_data])
+        else:
+            ws.append_row(row_data)
+        return True
+    except Exception as e:
+        print(f"Erro ao registrar na aba UP_DOWN: {e}")
+        return False
+
 def extrair_texto_da_mensagem(payload):
     """Extrai e limpa o texto do e-mail (suporta Plain e HTML)."""
     try:
@@ -1139,6 +1176,13 @@ def modulo_enviador_pleito():
                 
                 st.success("✅ E-mail enviado com sucesso pelo seu próprio Gmail!")
                 st.balloons()
+                
+                # Registra na planilha UP_DOWN automaticamente
+                with st.spinner("Registrando na planilha UP_DOWN..."):
+                    if registrar_up_down_planilha(dados):
+                        st.success(f"📌 INEP {dados.get('inep', '')} registrado na aba UP_DOWN da planilha oficial!")
+                    else:
+                        st.warning("⚠️ E-mail foi enviado, mas houve uma falha ao registrar na planilha UP_DOWN.")
             except Exception as e:
                 st.error(f"Erro ao enviar e-mail: {e}")
 
