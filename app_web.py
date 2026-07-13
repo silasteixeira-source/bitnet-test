@@ -894,6 +894,7 @@ def modulo_enviador_pleito():
                 creds = Credentials.from_authorized_user_info(token_data, ['https://www.googleapis.com/auth/gmail.send'])
                 if creds and creds.valid:
                     st.session_state["gmail_creds"] = creds
+                    st.session_state["email_token_envio"] = token_upload.name.replace("token_envio_", "").replace(".json", "")
                     st.success("✅ Token local carregado com sucesso!")
                     st.rerun()
                 else:
@@ -1086,9 +1087,26 @@ def modulo_enviador_pleito():
                 
                 # --- TRAVA DE SEGURANÇA DE DOMÍNIO ---
                 try:
-                    profile = gmail_service.users().getProfile(userId='me').execute()
-                    user_email = profile.get('emailAddress', '').lower()
-                except Exception:
+                    # Tentar descobrir o e-mail pelo JWT salvo no token, pois a API getProfile pode ser bloqueada
+                    import base64
+                    import json
+                    creds = st.session_state.get("gmail_creds")
+                    user_email = "desconhecido"
+                    if creds and hasattr(creds, 'id_token') and creds.id_token:
+                        parts = creds.id_token.split('.')
+                        if len(parts) >= 2:
+                            payload = parts[1]
+                            payload += '=' * (-len(payload) % 4)
+                            user_info = json.loads(base64.urlsafe_b64decode(payload).decode('utf-8'))
+                            user_email = user_info.get('email', 'desconhecido').lower()
+                    
+                    if user_email == "desconhecido":
+                        # Caso fallback, tenta ler o email do nome do arquivo salvo no Streamlit caso exista
+                        email_token_envio = st.session_state.get("email_token_envio")
+                        if email_token_envio:
+                            user_email = email_token_envio
+                            
+                except Exception as e:
                     user_email = "desconhecido"
                 modelo = st.session_state.get('modelo_pleito', 'ST1')
                 
