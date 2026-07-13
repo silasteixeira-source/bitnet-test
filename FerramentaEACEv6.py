@@ -3391,18 +3391,24 @@ class GerenciadorTokensApp:
 
         def run_flow():
             try:
-                SCOPES_GMAIL = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/userinfo.email']
+                SCOPES_GMAIL = ['https://www.googleapis.com/auth/gmail.send', 'openid', 'https://www.googleapis.com/auth/userinfo.email']
                 flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES_GMAIL)
                 creds = flow.run_local_server(port=0)
                 
-                # Buscar email via urllib para evitar erro de API desativada no GCP
-                import urllib.request
+                # Decodificar o id_token (JWT) localmente sem fazer requisição HTTP para evitar erros de API do GCP
                 import json
-                req = urllib.request.Request('https://www.googleapis.com/oauth2/v2/userinfo')
-                req.add_header('Authorization', f'Bearer {creds.token}')
-                with urllib.request.urlopen(req) as response:
-                    user_info = json.loads(response.read().decode('utf-8'))
-                email = user_info.get('email', 'desconhecido').lower()
+                import base64
+                if hasattr(creds, 'id_token') and creds.id_token:
+                    parts = creds.id_token.split('.')
+                    if len(parts) >= 2:
+                        payload = parts[1]
+                        payload += '=' * (-len(payload) % 4)
+                        user_info = json.loads(base64.urlsafe_b64decode(payload).decode('utf-8'))
+                        email = user_info.get('email', 'desconhecido').lower()
+                    else:
+                        email = 'desconhecido'
+                else:
+                    email = 'desconhecido'
                 
                 downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
                 token_filename = os.path.join(downloads_folder, f"token_envio_{email}.json")
