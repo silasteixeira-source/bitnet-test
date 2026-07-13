@@ -3395,9 +3395,13 @@ class GerenciadorTokensApp:
                 flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES_GMAIL)
                 creds = flow.run_local_server(port=0)
                 
-                # Buscar email via oauth2 para não exigir escopo de leitura do gmail
-                svc_oauth = build('oauth2', 'v2', credentials=creds)
-                user_info = svc_oauth.userinfo().get().execute()
+                # Buscar email via urllib para evitar erro de API desativada no GCP
+                import urllib.request
+                import json
+                req = urllib.request.Request('https://www.googleapis.com/oauth2/v2/userinfo')
+                req.add_header('Authorization', f'Bearer {creds.token}')
+                with urllib.request.urlopen(req) as response:
+                    user_info = json.loads(response.read().decode('utf-8'))
                 email = user_info.get('email', 'desconhecido').lower()
                 
                 downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
