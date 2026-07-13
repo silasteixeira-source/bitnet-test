@@ -5,7 +5,7 @@
 ; ================================================================
 
 #define MyAppName      "Ferramenta EACE NOC"
-#define MyAppVersion   "8.4"
+#define MyAppVersion   "8.5"
 #define MyAppPublisher "Bitnet Telecom"
 #define MyAppExeName   "Ferramenta_EACE_NOC.exe"
 #define SourceDir      "."

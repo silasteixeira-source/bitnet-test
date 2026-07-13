@@ -3391,14 +3391,20 @@ class GerenciadorTokensApp:
 
         def run_flow():
             try:
-                SCOPES_GMAIL = ['https://www.googleapis.com/auth/gmail.send']
+                SCOPES_GMAIL = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/userinfo.email']
                 flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES_GMAIL)
                 creds = flow.run_local_server(port=0)
+                
+                # Buscar email
+                svc = build('gmail', 'v1', credentials=creds)
+                perfil = svc.users().getProfile(userId='me').execute()
+                email = perfil.get('emailAddress', 'desconhecido').lower()
+                
                 downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
-                token_filename = os.path.join(downloads_folder, "meu_token_envio.json")
+                token_filename = os.path.join(downloads_folder, f"token_envio_{email}.json")
                 with open(token_filename, 'w') as token:
                     token.write(creds.to_json())
-                msg = f"Token gerado com sucesso!\n\nArquivo salvo em:\n{token_filename}\n\nFaça o upload deste arquivo na página web (Streamlit) para habilitar o envio."
+                msg = f"Token gerado com sucesso!\n\nConta: {email}\n\nArquivo salvo em:\n{token_filename}\n\nFaça o upload deste arquivo na página web (Streamlit) para habilitar o envio."
                 self.frame.after(0, lambda: messagebox.showinfo("Sucesso", msg))
             except Exception as e:
                 self.frame.after(0, lambda: messagebox.showerror("Erro Fatal", f"Ocorreu um erro ao gerar o token:\n{e}"))

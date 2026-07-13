@@ -885,7 +885,7 @@ def modulo_enviador_pleito():
     if "gmail_creds" not in st.session_state or not st.session_state["gmail_creds"].valid:
         st.info("🔒 Para continuar, você precisa fazer login com sua conta do Google para enviar os e-mails em seu próprio nome.")
         
-        token_upload = st.file_uploader("Alternativa: Faça upload do arquivo 'meu_token_envio.json' gerado localmente (Pula verificação do Google)", type=["json"])
+        token_upload = st.file_uploader("Alternativa: Faça upload do arquivo 'token_envio_SEU_EMAIL.json' gerado localmente (Pula verificação do Google)", type=["json"])
         if token_upload:
             try:
                 import json
@@ -1092,11 +1092,11 @@ def modulo_enviador_pleito():
                     user_email = "desconhecido"
                 modelo = st.session_state.get('modelo_pleito', 'ST1')
                 
-                if modelo == "BITNET" and "st1.net.br" in user_email:
-                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio ST1).")
+                if modelo == "BITNET" and not user_email.endswith("@bitinternet.com.br"):
+                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **BITNET**, mas o seu e-mail do Google conectado é `{user_email}`. É obrigatório usar um e-mail @bitinternet.com.br.")
                     return
-                elif modelo == "ST1" and "bitinternet.com.br" in user_email:
-                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **ST1**, mas o seu e-mail do Google conectado é `{user_email}` (Domínio BITNET).")
+                elif modelo == "ST1" and not user_email.endswith("@st1.net.br"):
+                    st.error(f"❌ Operação Cancelada! Você está tentando enviar um pleito do modelo **ST1**, mas o seu e-mail do Google conectado é `{user_email}`. É obrigatório usar um e-mail @st1.net.br.")
                     return
                 # -------------------------------------
                 
