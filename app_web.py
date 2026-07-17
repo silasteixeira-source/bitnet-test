@@ -65,6 +65,75 @@ def authenticate_gmail():
             
     return build('gmail', 'v1', credentials=creds)
 
+def get_all_gmail_services():
+    """
+    Retorna uma lista de tuplas (service, email_conta, nome_conta) com todas as contas de leitura disponíveis.
+    Lê os tokens do Streamlit Secrets ([tokens_leitura]) e/ou arquivos locais.
+    """
+    services = []
+    
+    # 1. Tenta carregar a conta principal (já existente)
+    try:
+        main_svc = authenticate_gmail()
+        if main_svc:
+            perfil = main_svc.users().getProfile(userId='me').execute()
+            meu_email = perfil.get('emailAddress', '').lower()
+            services.append((main_svc, meu_email, "Minha Conta (Principal)"))
+    except Exception as e:
+        pass
+        
+    # 2. Carrega tokens do Streamlit Secrets (ex: tokens_leitura.membro1)
+    if "tokens_leitura" in st.secrets:
+        tokens_secret = dict(st.secrets["tokens_leitura"])
+        for nome_conta, token_data in tokens_secret.items():
+            try:
+                if isinstance(token_data, str):
+                    import json
+                    token_dict = json.loads(token_data)
+                else:
+                    token_dict = dict(token_data)
+                    
+                from google.oauth2.credentials import Credentials
+                creds = Credentials.from_authorized_user_info(token_dict, SCOPES_GMAIL)
+                
+                if creds and creds.expired and creds.refresh_token:
+                    from google.auth.transport.requests import Request
+                    creds.refresh(Request())
+                    
+                svc = build('gmail', 'v1', credentials=creds)
+                perfil = svc.users().getProfile(userId='me').execute()
+                email = perfil.get('emailAddress', '').lower()
+                
+                # Evitar duplicatas
+                if not any(email == s[1] for s in services):
+                    services.append((svc, email, nome_conta.capitalize()))
+            except Exception as e:
+                print(f"Erro ao carregar token do secret {nome_conta}: {e}")
+
+    # 3. Carrega tokens de leitura adicionais locais (se houver)
+    base_path = os.getcwd()
+    for f in os.listdir(base_path):
+        if f.startswith('token_leitura') and f.endswith('.json') and f != 'token_leitura.json':
+            try:
+                caminho = os.path.join(base_path, f)
+                from google.oauth2.credentials import Credentials
+                creds = Credentials.from_authorized_user_file(caminho, SCOPES_GMAIL)
+                
+                if creds and creds.expired and creds.refresh_token:
+                    from google.auth.transport.requests import Request
+                    creds.refresh(Request())
+                    
+                svc = build('gmail', 'v1', credentials=creds)
+                perfil = svc.users().getProfile(userId='me').execute()
+                email = perfil.get('emailAddress', '').lower()
+                
+                if not any(email == s[1] for s in services):
+                    services.append((svc, email, f"Arquivo {f}"))
+            except Exception as e:
+                print(f"Erro ao carregar token local {f}: {e}")
+                
+    return services
+
 # ----------------- AUTENTICAÇÃO PLANILHAS -----------------
 @st.cache_resource
 def authenticate_google_sheets():
@@ -245,79 +314,94 @@ def modulo_robo_gmail():
         if not termo:
             st.warning("Por favor, digite um termo para buscar.")
         else:
-            with st.spinner("Conectando ao Gmail e varrendo a caixa de entrada..."):
-                service = authenticate_gmail()
-                if service:
-                    try:
-                        query = f'subject:("{termo}") OR "{termo}"'
-                        results = service.users().messages().list(userId='me', q=query, maxResults=50).execute()
-                        messages = results.get('messages', [])
-                        
-                        if not messages:
-                            st.info("Nenhum e-mail encontrado para o termo pesquisado.")
-                        else:
-                            st.success(f"Foram encontrados {len(messages)} e-mails referentes à busca!")
+            with st.spinner("Conectando ao Gmail e varrendo caixas de entrada da equipe..."):
+                services = get_all_gmail_services()
+                if not services:
+                    st.error("Nenhuma conta do Gmail configurada para leitura. Gere um token primeiro.")
+                else:
+                    mensagens_totais = []
+                    ids_processados = set()
+                    
+                    query = f'subject:("{termo}") OR "{termo}"'
+                    
+                    for service, email_conta, nome_conta in services:
+                        try:
+                            results = service.users().messages().list(userId='me', q=query, maxResults=30).execute()
+                            msgs_encontradas = results.get('messages', [])
                             
-                            for msg in messages:
-                                msg_full = service.users().messages().get(userId='me', id=msg['id'], format='full').execute()
+                            for msg in msgs_encontradas:
+                                if msg['id'] not in ids_processados:
+                                    ids_processados.add(msg['id'])
+                                    msg_full = service.users().messages().get(userId='me', id=msg['id'], format='full').execute()
+                                    msg_full['_conta_origem'] = nome_conta
+                                    msg_full['_email_origem'] = email_conta
+                                    msg_full['_service'] = service
+                                    mensagens_totais.append(msg_full)
+                        except Exception as e:
+                            st.warning(f"Erro ao buscar na conta {email_conta}: {e}")
+                            
+                    if not mensagens_totais:
+                        st.info("Nenhum e-mail encontrado para o termo pesquisado em nenhuma conta da equipe.")
+                    else:
+                        st.success(f"Foram encontrados {len(mensagens_totais)} e-mails referentes à busca na equipe!")
+                        
+                        for msg_full in mensagens_totais:
+                            headers = msg_full.get("payload", {}).get("headers", [])
+                            assunto = next((h['value'] for h in headers if h['name'].lower() == 'subject'), "Sem Assunto")
+                            remetente = next((h['value'] for h in headers if h['name'].lower() == 'from'), "Desconhecido")
+                            data_str = next((h['value'] for h in headers if h['name'].lower() == 'date'), "")
+                            
+                            try:
+                                import email.utils
+                                from zoneinfo import ZoneInfo
+                                parsed_date = email.utils.parsedate_to_datetime(data_str)
+                                parsed_date = parsed_date.astimezone(ZoneInfo('America/Sao_Paulo'))
+                                data_formatada = parsed_date.strftime("%d/%m/%Y %H:%M")
+                            except Exception as e:
+                                data_formatada = data_str
                                 
-                                headers = msg_full.get("payload", {}).get("headers", [])
-                                assunto = next((h['value'] for h in headers if h['name'].lower() == 'subject'), "Sem Assunto")
-                                remetente = next((h['value'] for h in headers if h['name'].lower() == 'from'), "Desconhecido")
-                                data_str = next((h['value'] for h in headers if h['name'].lower() == 'date'), "")
+                            conta_label = f"[{msg_full.get('_conta_origem', 'Desconhecido')}]"
+                            titulo_expander = f"📅 {data_formatada} | {conta_label} | 👤 {remetente} | 📌 {assunto}"
+                            
+                            with st.expander(titulo_expander):
+                                st.write(f"**Conta onde foi localizado:** {msg_full.get('_email_origem', '')} ({msg_full.get('_conta_origem', '')})")
+                                st.write(f"**Remetente:** {remetente}")
+                                st.write(f"**Data:** {data_formatada}")
+                                st.markdown("#### Corpo da Mensagem:")
+                                payload = msg_full.get("payload", {})
+                                texto_corpo = extrair_texto_da_mensagem(payload)
+                                st.text(texto_corpo)
                                 
-                                try:
-                                    import email.utils
-                                    from zoneinfo import ZoneInfo
-                                    parsed_date = email.utils.parsedate_to_datetime(data_str)
-                                    # Converte a data do e-mail para o fuso horário do Brasil
-                                    parsed_date = parsed_date.astimezone(ZoneInfo('America/Sao_Paulo'))
-                                    data_formatada = parsed_date.strftime("%d/%m/%Y %H:%M")
-                                except Exception as e:
-                                    data_formatada = data_str
+                                # Extrair e exibir anexos
+                                arquivos = extrair_arquivos_da_mensagem(msg_full.get('_service'), msg_full['id'], payload)
+                                if arquivos:
+                                    st.markdown("---")
+                                    st.markdown("#### 📁 Anexos Deste E-mail:")
                                     
-                                titulo_expander = f"📅 {data_formatada} | 👤 {remetente} | 📌 {assunto}"
-                                
-                                with st.expander(titulo_expander):
-                                    st.markdown("#### Corpo da Mensagem:")
-                                    payload = msg_full.get("payload", {})
-                                    texto_corpo = extrair_texto_da_mensagem(payload)
-                                    st.text(texto_corpo)
+                                    for i, arq in enumerate(arquivos):
+                                        col_a1, col_a2 = st.columns([4, 1])
+                                        with col_a1:
+                                            st.write(f"📎 **{arq['filename']}**")
+                                        with col_a2:
+                                            st.download_button(
+                                                label="Baixar Anexo",
+                                                data=arq['bytes'],
+                                                file_name=arq['filename'],
+                                                mime=arq['mimeType'],
+                                                key=f"dl_{msg_full['id']}_{i}_{arq['filename']}"
+                                            )
                                     
-                                    # Extrair e exibir anexos
-                                    arquivos = extrair_arquivos_da_mensagem(service, msg['id'], payload)
-                                    if arquivos:
-                                        st.markdown("---")
-                                        st.markdown("#### 📁 Anexos Deste E-mail:")
-                                        
-                                        # Separa imagens de PDFs para exibir de forma bonita
-                                        imagens = [a for a in arquivos if a["mimeType"].startswith("image/")]
-                                        pdfs = [a for a in arquivos if a["mimeType"] == "application/pdf"]
-                                        
-                                        if pdfs:
-                                            st.write("**📄 Documentos (PDF):**")
-                                            for p in pdfs:
-                                                st.download_button(
-                                                    label=f"⬇️ Baixar {p['filename']}",
-                                                    data=p['bytes'],
-                                                    file_name=p['filename'],
-                                                    mime="application/pdf",
-                                                    key=f"dl_{msg['id']}_{p['filename']}"
-                                                )
-                                                
-                                        if imagens:
-                                            st.write("**🖼️ Imagens / Prints:**")
-                                            cols = st.columns(min(len(imagens), 3))
-                                            for i, img in enumerate(imagens):
-                                                with cols[i % len(cols)]:
-                                                    try:
-                                                        st.image(img["bytes"], caption=img["filename"], use_container_width=True)
-                                                    except Exception as e:
-                                                        st.error(f"Erro ao exibir {img['filename']}: {e}")
-                                                    
-                                    
-                    except Exception as e:
-                        st.error(f"Ocorreu um erro durante a busca: {e}")
+                                    imagens = [a for a in arquivos if a["mimeType"].startswith("image/")]
+                                    if imagens:
+                                        st.write("**🖼️ Imagens / Prints:**")
+                                        cols = st.columns(min(len(imagens), 3))
+                                        for i, img in enumerate(imagens):
+                                            with cols[i % len(cols)]:
+                                                try:
+                                                    st.image(img["bytes"], caption=img["filename"], use_container_width=True)
+                                                except Exception as e:
+                                                    st.error(f"Erro ao exibir {img['filename']}: {e}")
+
 
 def modulo_consulta_eace():
     st.title("📊 Consulta Rápida — EACE")
